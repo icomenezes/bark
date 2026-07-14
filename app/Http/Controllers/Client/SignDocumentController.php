@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
+use App\Models\AccessLog;
 use App\Models\Certificate;
 use App\Services\AccessLogService;
 use App\Services\Pdf\PdfSignerService;
@@ -17,7 +18,15 @@ class SignDocumentController extends Controller
     {
         $certificates = auth()->user()->certificates()->orderBy('description')->get();
 
-        return view('client.sign-document.index', compact('certificates'));
+        $signedDocuments = AccessLog::where('user_id', auth()->id())
+            ->where('event', 'document_signed')
+            ->latest('created_at')
+            ->limit(50)
+            ->get()
+            ->filter(fn (AccessLog $log) => ! empty($log->meta['file'])
+                && Storage::disk('local')->exists('signed/'.auth()->id().'/'.$log->meta['file']));
+
+        return view('client.sign-document.index', compact('certificates', 'signedDocuments'));
     }
 
     /** Assina um PDF enviado pelo usuário. */
@@ -38,7 +47,7 @@ class SignDocumentController extends Controller
                 $position,
                 $request->boolean('use_tsa')
             );
-        });
+        }, $request->file('pdf')->getClientOriginalName());
     }
 
     /** Gera um documento a partir do template genérico e assina. */
@@ -60,7 +69,7 @@ class SignDocumentController extends Controller
                 $position,
                 $request->boolean('use_tsa')
             );
-        });
+        }, 'Documento gerado pelo sistema');
     }
 
     /** Download da saída assinada — somente arquivos do próprio usuário. */
@@ -76,7 +85,7 @@ class SignDocumentController extends Controller
 
     // ─── Privados ─────────────────────────────────────────────────────────────
 
-    private function handleSigning(Request $request, \Closure $operation)
+    private function handleSigning(Request $request, \Closure $operation, string $originalName = '')
     {
         $certificate = Certificate::find($request->certificate_id);
         abort_if($certificate === null || $certificate->user_id !== auth()->id(), 403);
@@ -102,8 +111,12 @@ class SignDocumentController extends Controller
 
             $this->accessLog->log(auth()->user(), 'document_signed', [
                 'certificate_id' => $certificate->id,
+                'certificate_description' => $certificate->description,
                 'engine' => $signer->engine(),
                 'tsa' => $request->boolean('use_tsa'),
+                'use_seal' => $request->boolean('use_seal'),
+                'file' => basename($relative),
+                'original_name' => $originalName,
             ]);
 
             $response = redirect()->route('sign-document.index')

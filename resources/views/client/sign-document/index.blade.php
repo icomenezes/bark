@@ -31,6 +31,45 @@
         </div>
     @endif
 
+    @if($signedDocuments->isNotEmpty())
+        <div class="bg-gray-900 rounded-lg border border-gray-800 p-6">
+            <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider border-b border-gray-800 pb-2 mb-4">
+                Documentos assinados anteriormente
+            </h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead>
+                        <tr class="text-xs text-gray-500 uppercase">
+                            <th class="pb-2 pr-4">Data</th>
+                            <th class="pb-2 pr-4">Documento</th>
+                            <th class="pb-2 pr-4">Certificado</th>
+                            <th class="pb-2 pr-4">Motor</th>
+                            <th class="pb-2 pr-4">TSA</th>
+                            <th class="pb-2 pr-4">Selo</th>
+                            <th class="pb-2"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800">
+                        @foreach($signedDocuments as $log)
+                            <tr class="text-gray-300">
+                                <td class="py-2 pr-4 whitespace-nowrap text-gray-400">{{ $log->created_at->format('d/m/Y H:i') }}</td>
+                                <td class="py-2 pr-4">{{ $log->meta['original_name'] ?? $log->meta['file'] }}</td>
+                                <td class="py-2 pr-4">{{ $log->meta['certificate_description'] ?? '—' }}</td>
+                                <td class="py-2 pr-4 uppercase text-xs text-gray-400">{{ $log->meta['engine'] ?? '—' }}</td>
+                                <td class="py-2 pr-4">{{ ($log->meta['tsa'] ?? false) ? 'Sim' : 'Não' }}</td>
+                                <td class="py-2 pr-4">{{ ($log->meta['use_seal'] ?? false) ? 'Sim' : 'Não' }}</td>
+                                <td class="py-2 text-right">
+                                    <a href="{{ route('sign-document.download', $log->meta['file']) }}"
+                                       class="text-blue-400 hover:underline text-xs font-medium">Baixar</a>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
+
     @if($certificates->isEmpty())
         <div class="text-center py-16 text-gray-500 bg-gray-900 border border-gray-800 rounded-xl">
             <p class="font-medium">Nenhum certificado cadastrado</p>
