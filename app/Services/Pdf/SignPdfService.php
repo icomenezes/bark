@@ -55,11 +55,14 @@ class SignPdfService
             throw new \RuntimeException("Arquivo PFX não encontrado: {$pfxPath}");
         }
 
-        $pfxContent = file_get_contents($pfxPath);
-        $p12 = [];
+        // Pkcs12Reader converte PFX legado (RC2/3DES) que o OpenSSL 3 não lê nativamente
+        $reader = new Pkcs12Reader;
+        $p12 = $reader->read((string) file_get_contents($pfxPath), $password);
 
-        if (! openssl_pkcs12_read($pfxContent, $p12, $password)) {
-            throw new \RuntimeException('Falha ao ler PFX: senha incorreta ou arquivo corrompido.');
+        if ($p12 === null) {
+            throw new \RuntimeException($reader->wasWrongPassword()
+                ? 'Falha ao ler PFX: senha incorreta.'
+                : 'Falha ao ler PFX: formato legado não suportado ('.implode(' | ', $reader->errors()).')');
         }
 
         $this->certPem = $p12['cert'];

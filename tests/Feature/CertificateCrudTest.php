@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Certificate;
 use App\Models\User;
+use App\Services\Pdf\Pkcs12Reader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -54,6 +55,37 @@ class CertificateCrudTest extends TestCase
         $this->assertNotNull($certificate->expires_at);
         $this->assertTrue($certificate->expires_at->isFuture());
         Storage::disk('local')->assertExists($certificate->pfx_path);
+    }
+
+    public function test_store_accepts_legacy_rc2_pfx_and_normalizes_it(): void
+    {
+        if (! (new Pkcs12Reader)->conversionAvailable()) {
+            $this->markTestSkipped('Nenhum CLI openssl capaz de ler PFX legado disponível nesta máquina.');
+        }
+
+        Storage::fake('local');
+        $client = User::factory()->create(['role' => 'client']);
+
+        // Cópia do fixture: UploadedFile pode mover o arquivo em alguns fluxos
+        $tmp = tempnam(sys_get_temp_dir(), 'leg_').'.pfx';
+        copy(base_path('tests/Fixtures/legacy-rc2-40.pfx'), $tmp);
+
+        $this->actingAs($client)->post('/certificates', [
+            'description' => 'A1 legado (RC2-40)',
+            'pfx' => new UploadedFile($tmp, 'legacy.pfx', 'application/octet-stream', null, true),
+            'password' => 'secret',
+        ])->assertRedirect(route('certificates.index'))
+            ->assertSessionHasNoErrors();
+
+        $certificate = Certificate::first();
+        $this->assertNotNull($certificate->expires_at);
+
+        // O PFX armazenado deve ter sido normalizado: legível pelo OpenSSL 3 nativo
+        $native = [];
+        $this->assertTrue(
+            openssl_pkcs12_read((string) Storage::disk('local')->get($certificate->pfx_path), $native, 'secret'),
+            'PFX armazenado deve estar em formato moderno'
+        );
     }
 
     public function test_store_rejects_wrong_pfx_password(): void

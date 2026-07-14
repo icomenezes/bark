@@ -50,10 +50,19 @@ class PyHankoSigner
             throw new \RuntimeException('Arquivo PFX não encontrado: '.$pfxPath);
         }
 
-        // Valida a senha antes: o erro da CLI para PFX inválido é genérico
-        $p12 = [];
-        if (! openssl_pkcs12_read((string) file_get_contents($pfxPath), $p12, $password)) {
-            throw new \RuntimeException('Falha ao ler PFX: senha incorreta ou arquivo corrompido.');
+        // Valida a senha antes: o erro da CLI para PFX inválido é genérico.
+        // PFX legado (RC2/3DES) é convertido e a CLI recebe o arquivo moderno.
+        $reader = new Pkcs12Reader;
+        $tempPfx = null;
+        if ($reader->read((string) file_get_contents($pfxPath), $password) === null) {
+            throw new \RuntimeException($reader->wasWrongPassword()
+                ? 'Falha ao ler PFX: senha incorreta.'
+                : 'Falha ao ler PFX: formato legado não suportado ('.implode(' | ', $reader->errors()).')');
+        }
+        if ($reader->wasConverted()) {
+            $tempPfx = (string) tempnam(sys_get_temp_dir(), 'pfx_mod_');
+            file_put_contents($tempPfx, $reader->normalizedContent());
+            $pfxPath = $tempPfx;
         }
 
         $field = $this->fieldSpec($pdfIn, $position);
@@ -90,6 +99,9 @@ class PyHankoSigner
         @unlink($passfile);
         if ($configYml) {
             @unlink($configYml);
+        }
+        if ($tempPfx) {
+            @unlink($tempPfx);
         }
 
         if ($code !== 0 || ! file_exists($pdfOut) || filesize($pdfOut) === 0) {

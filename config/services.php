@@ -46,4 +46,9 @@ return [
         'bin' => env('PYHANKO_BIN'),
     ],
 
+    // CLI openssl para converter PFX legado (RC2/3DES) que o OpenSSL 3 do PHP não lê
+    'openssl' => [
+        'bin' => env('OPENSSL_BIN'),
+    ],
+
 ];

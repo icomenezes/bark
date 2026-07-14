@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Client;
 use App\Http\Controllers\Controller;
 use App\Models\Certificate;
 use App\Services\AccessLogService;
+use App\Services\Pdf\Pkcs12Reader;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
@@ -36,17 +38,17 @@ class CertificateController extends Controller
             'logo_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
         ]);
 
-        $expiresAt = $this->readPfxExpiration($request->file('pfx')->getRealPath(), $request->password);
+        $pfx = $this->readPfx((string) file_get_contents($request->file('pfx')->getRealPath()), $request->password);
 
         $certificate = auth()->user()->certificates()->create([
             'description' => $request->description,
             'reference' => $request->reference,
             'pfx_path' => '',
             'password' => $request->password,
-            'expires_at' => $expiresAt,
+            'expires_at' => $pfx['expires_at'],
         ]);
 
-        $certificate->update($this->storeFiles($request, $certificate));
+        $certificate->update($this->storeFiles($request, $certificate, $pfx['content']));
 
         $this->accessLog->log(auth()->user(), 'certificate_created', ['certificate_id' => $certificate->id]);
 
@@ -78,20 +80,25 @@ class CertificateController extends Controller
             'description' => $request->description,
             'reference' => $request->reference,
         ];
+        $pfxContent = null;
 
         // PFX novo (ou só troca de senha) — revalida contra o arquivo e atualiza a validade
         if ($request->hasFile('pfx')) {
+            $pfx = $this->readPfx((string) file_get_contents($request->file('pfx')->getRealPath()), $request->password);
             $data['password'] = $request->password;
-            $data['expires_at'] = $this->readPfxExpiration($request->file('pfx')->getRealPath(), $request->password);
+            $data['expires_at'] = $pfx['expires_at'];
+            $pfxContent = $pfx['content'];
         } elseif ($request->filled('password')) {
-            $data['password'] = $request->password;
-            $data['expires_at'] = $this->readPfxExpiration(
-                Storage::disk('local')->path($certificate->pfx_path),
+            $pfx = $this->readPfx(
+                (string) Storage::disk('local')->get($certificate->pfx_path),
                 $request->password
             );
+            $data['password'] = $request->password;
+            $data['expires_at'] = $pfx['expires_at'];
+            $pfxContent = $pfx['content'];
         }
 
-        $certificate->update($data + $this->storeFiles($request, $certificate));
+        $certificate->update($data + $this->storeFiles($request, $certificate, $pfxContent));
 
         return redirect()->route('certificates.index')
             ->with('success', 'Certificado atualizado com sucesso.');
@@ -134,30 +141,50 @@ class CertificateController extends Controller
 
     /**
      * Valida a senha contra o PFX e extrai a data de expiração (validTo do X.509).
-     * Senha errada nunca chega ao banco.
+     * Senha errada nunca chega ao banco. PFX legado (RC2/3DES, ilegível pelo
+     * OpenSSL 3) é convertido para o formato moderno — persista 'content'.
+     *
+     * @return array{expires_at: ?string, content: string}
      */
-    private function readPfxExpiration(string $pfxAbsolutePath, string $password): ?string
+    private function readPfx(string $pfxContent, string $password): array
     {
-        $p12 = [];
-        if (! openssl_pkcs12_read((string) file_get_contents($pfxAbsolutePath), $p12, $password)) {
+        $reader = new Pkcs12Reader;
+        $p12 = $reader->read($pfxContent, $password);
+
+        if ($p12 === null) {
+            Log::warning('Falha ao ler PFX no cadastro de certificado', [
+                'user_id' => auth()->id(),
+                'wrong_password' => $reader->wasWrongPassword(),
+                'conversion_available' => $reader->conversionAvailable(),
+                'openssl_errors' => $reader->errors(),
+            ]);
+
             throw ValidationException::withMessages([
-                'password' => 'Não foi possível ler o PFX: senha incorreta ou arquivo inválido.',
+                'password' => $reader->wasWrongPassword()
+                    ? 'Senha do PFX incorreta.'
+                    : 'O PFX usa algoritmos antigos (RC2/3DES) que o OpenSSL 3 não lê e a conversão automática '
+                      .'não está disponível neste servidor. Instale o CLI do OpenSSL (ou defina OPENSSL_BIN) '
+                      .'ou reexporte o certificado em formato moderno. Detalhes em storage/logs/laravel.log.',
             ]);
         }
 
         $info = openssl_x509_parse($p12['cert']) ?: [];
 
-        return isset($info['validTo_time_t']) ? date('Y-m-d', (int) $info['validTo_time_t']) : null;
+        return [
+            'expires_at' => isset($info['validTo_time_t']) ? date('Y-m-d', (int) $info['validTo_time_t']) : null,
+            'content' => (string) $reader->normalizedContent(),
+        ];
     }
 
-    /** Grava PFX e imagens em certificates/{id}/ no disk local; retorna os paths preenchidos. */
-    private function storeFiles(Request $request, Certificate $certificate): array
+    /** Grava PFX (conteúdo já normalizado) e imagens em certificates/{id}/ no disk local. */
+    private function storeFiles(Request $request, Certificate $certificate, ?string $pfxContent = null): array
     {
         $dir = 'certificates/'.$certificate->id;
         $data = [];
 
-        if ($request->hasFile('pfx')) {
-            $data['pfx_path'] = $request->file('pfx')->storeAs($dir, 'certificate.pfx', 'local');
+        if ($pfxContent !== null) {
+            $data['pfx_path'] = $dir.'/certificate.pfx';
+            Storage::disk('local')->put($data['pfx_path'], $pfxContent);
         }
         if ($request->hasFile('sign_image')) {
             $ext = $request->file('sign_image')->extension();

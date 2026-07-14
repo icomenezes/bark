@@ -129,6 +129,12 @@ Porte do módulo do ERP (`erp.fitlikeaglove.com.br`) — spec em
 - Coordenadas: form → backend em pontos PDF origem topo-esquerdo; pyHanko usa base-esquerda
   (`y1 = alturaPagina − y − h`, conversão em `PyHankoSigner::fieldSpec()`).
 - Saída assinada: disk `local` em `signed/{user_id}/doc_<hex>.pdf`.
+- `Pkcs12Reader` — leitura de PFX resiliente: OpenSSL 3 (PHP 8.3) não lê PFX legado
+  (RC2-40/3DES, comum em A1 de ACs brasileiras) e falha com "unsupported" MESMO com senha
+  correta (senha errada dá "mac verify failure" — são distinguíveis). O reader converte via
+  CLI openssl (`-legacy` no v3; v0.9.8/1.x lê direto; override `OPENSSL_BIN` →
+  `services.openssl.bin`) e reexporta moderno com `openssl_pkcs12_export`; o conteúdo
+  normalizado é persistido no upload. Falhas de leitura são logadas em `storage/logs/laravel.log`.
 
 ---
 
