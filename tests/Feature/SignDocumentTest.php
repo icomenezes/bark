@@ -27,13 +27,20 @@ class SignDocumentTest extends TestCase
     }
 
     /** Cadastra um certificado real (PFX válido) para o usuário via controller. */
-    private function createRealCertificate(User $user): Certificate
+    private function createRealCertificate(User $user, bool $withImages = false): Certificate
     {
-        $this->actingAs($user)->post('/certificates', [
+        $payload = [
             'description' => 'Certificado de teste',
             'pfx' => new UploadedFile($this->generatePfx('secret'), 'cert.pfx', 'application/octet-stream', null, true),
             'password' => 'secret',
-        ]);
+        ];
+
+        if ($withImages) {
+            $payload['sign_image'] = UploadedFile::fake()->image('assinatura.png', 300, 120);
+            $payload['logo_image'] = UploadedFile::fake()->image('selo.png', 150, 150);
+        }
+
+        $this->actingAs($user)->post('/certificates', $payload);
 
         return Certificate::latest('id')->first();
     }
@@ -152,6 +159,42 @@ class SignDocumentTest extends TestCase
             'drawn_signature' => 'data:image/png;base64,not-a-png',
         ])->assertRedirect(route('sign-document.index'))
             ->assertSessionHas('error');
+    }
+
+    public function test_signs_with_authentication_seal(): void
+    {
+        Storage::fake('local');
+        $client = User::factory()->create(['role' => 'client']);
+        $certificate = $this->createRealCertificate($client, withImages: true);
+
+        $response = $this->actingAs($client)->post('/sign-document/sign', [
+            'certificate_id' => $certificate->id,
+            'pdf' => new UploadedFile($this->makeSourcePdf(), 'doc.pdf', 'application/pdf', null, true),
+            'use_seal' => '1',
+        ]);
+
+        $response->assertRedirect(route('sign-document.index'))
+            ->assertSessionHas('signed_file')
+            ->assertSessionMissing('error');
+
+        $relative = 'signed/'.$client->id.'/'.session('signed_file');
+        $this->assertStringContainsString('/ByteRange', Storage::disk('local')->get($relative));
+    }
+
+    public function test_seal_without_registered_logo_fails_clearly(): void
+    {
+        Storage::fake('local');
+        $client = User::factory()->create(['role' => 'client']);
+        $certificate = $this->createRealCertificate($client); // sem imagens
+
+        $this->actingAs($client)->post('/sign-document/sign', [
+            'certificate_id' => $certificate->id,
+            'pdf' => new UploadedFile($this->makeSourcePdf(), 'doc.pdf', 'application/pdf', null, true),
+            'use_seal' => '1',
+        ])->assertRedirect(route('sign-document.index'))
+            ->assertSessionHas('error');
+
+        $this->assertStringContainsString('selo', session('error'));
     }
 
     public function test_signing_with_expired_certificate_fails_clearly(): void

@@ -93,6 +93,11 @@ class SignDocumentController extends Controller
                 $signer->overrideSignImage($drawnTemp);
             }
 
+            // Selo de autenticação opcional: carimbo acima/à direita da assinatura
+            if ($request->boolean('use_seal')) {
+                $signer->applySeal();
+            }
+
             $relative = $operation($signer, $position);
 
             $this->accessLog->log(auth()->user(), 'document_signed', [
@@ -158,6 +163,7 @@ class SignDocumentController extends Controller
             'sign_page' => ['nullable', 'integer', 'min:1'],
             'signature_mode' => ['nullable', 'in:registered,draw'],
             'drawn_signature' => ['nullable', 'string', 'required_if:signature_mode,draw'],
+            'use_seal' => ['nullable', 'boolean'],
         ];
     }
 

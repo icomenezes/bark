@@ -54,7 +54,7 @@
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1.5">Imagem de logo:</label>
+            <label class="block text-sm font-medium text-gray-300 mb-1.5">Selo de autenticação (logo):</label>
             <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 min-h-[10rem] flex flex-col items-center justify-center gap-3">
                 @if($editing && $certificate->logo_image_path)
                     <img src="{{ route('certificates.image', [$certificate, 'logo']) }}"
@@ -63,6 +63,7 @@
                 <input type="file" name="logo_image" accept=".jpg,.jpeg,.png"
                        class="text-sm text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0
                               file:bg-gray-700 file:text-white file:text-sm hover:file:bg-gray-600">
+                <p class="text-xs text-gray-500">Estampado junto à assinatura quando "Usar selo de autenticação" estiver marcado. Prefira PNG com fundo transparente.</p>
             </div>
         </div>
         <div>

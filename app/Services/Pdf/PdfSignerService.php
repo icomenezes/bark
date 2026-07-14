@@ -17,6 +17,9 @@ class PdfSignerService
 {
     private const OUTPUT_DIR = 'signed';
 
+    /** Composição assinatura+selo usada como imagem principal do carimbo (rubricas ficam sem selo). */
+    private ?string $sealComposite = null;
+
     private function __construct(
         private string $pfxPath,
         private string $password,
@@ -56,13 +59,33 @@ class PdfSignerService
      */
     public function hasSignatureImage(): bool
     {
-        return $this->signImage !== null && file_exists($this->signImage);
+        return ($this->signImage !== null && file_exists($this->signImage))
+            || ($this->sealComposite !== null && file_exists($this->sealComposite));
     }
 
     /** Substitui a imagem de assinatura desta operação (ex.: assinatura desenhada na hora). */
     public function overrideSignImage(string $absolutePath): void
     {
         $this->signImage = $absolutePath;
+        $this->sealComposite = null; // selo (se pedido) deve ser recomposto sobre a nova imagem
+    }
+
+    /**
+     * Aplica o selo de autenticação (imagem de logo do certificado) sobre a
+     * assinatura — ligeiramente acima e à direita, como um carimbo. Sem imagem
+     * de assinatura, o selo sozinho vira o carimbo visual.
+     */
+    public function applySeal(): void
+    {
+        if (! $this->logoImage || ! file_exists($this->logoImage)) {
+            throw new \RuntimeException(
+                'Selo de autenticação solicitado, mas o certificado não tem imagem de selo/logo cadastrada.'
+            );
+        }
+
+        $this->sealComposite = ($this->signImage && file_exists($this->signImage))
+            ? SealComposer::compose($this->signImage, $this->logoImage)
+            : $this->logoImage;
     }
 
     /** Motor que será usado nesta assinatura (para logs). */
@@ -148,7 +171,15 @@ class PdfSignerService
             mkdir($dir, 0775, true);
         }
 
-        (new PyHankoSigner)->sign($inputAbs, $outputAbs, $this->pfxPath, $this->password, $position, $useTsa, $this->signImage);
+        (new PyHankoSigner)->sign(
+            $inputAbs,
+            $outputAbs,
+            $this->pfxPath,
+            $this->password,
+            $position,
+            $useTsa,
+            $this->sealComposite ?? $this->signImage
+        );
 
         return $relative;
     }
@@ -160,6 +191,9 @@ class PdfSignerService
 
         if ($this->signImage) {
             $svc->setSignImage($this->signImage);
+        }
+        if ($this->sealComposite) {
+            $svc->setMainImage($this->sealComposite);
         }
         if ($this->logoImage) {
             $svc->setLogoImage($this->logoImage);

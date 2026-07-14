@@ -129,6 +129,9 @@ Porte do módulo do ERP (`erp.fitlikeaglove.com.br`) — spec em
 - Coordenadas: form → backend em pontos PDF origem topo-esquerdo; pyHanko usa base-esquerda
   (`y1 = alturaPagina − y − h`, conversão em `PyHankoSigner::fieldSpec()`).
 - Saída assinada: disk `local` em `signed/{user_id}/doc_<hex>.pdf`.
+- `SealComposer` — flag "Usar selo de autenticação" (`use_seal`): compõe o selo (logo do
+  certificado) acima/à direita da assinatura via GD (PNG transparente) e usa como imagem
+  principal do carimbo; rubricas das demais páginas ficam só com a assinatura.
 - `Pkcs12Reader` — leitura de PFX resiliente: OpenSSL 3 (PHP 8.3) não lê PFX legado
   (RC2-40/3DES, comum em A1 de ACs brasileiras) e falha com "unsupported" MESMO com senha
   correta (senha errada dá "mac verify failure" — são distinguíveis). O reader converte via

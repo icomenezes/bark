@@ -126,6 +126,11 @@
                                class="rounded bg-gray-800 border-gray-600 text-blue-600 focus:ring-blue-500">
                         Carimbo de tempo TSA
                     </label>
+                    <label class="flex items-center gap-2 text-sm text-gray-300" title="Estampa o selo/logo do certificado acima e à direita da assinatura">
+                        <input type="checkbox" name="use_seal" value="1"
+                               class="rounded bg-gray-800 border-gray-600 text-blue-600 focus:ring-blue-500">
+                        Usar selo de autenticação
+                    </label>
                 </div>
             </div>
 

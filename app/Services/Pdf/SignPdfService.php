@@ -35,6 +35,9 @@ class SignPdfService
 
     private ?string $logoImagePath = null;
 
+    /** Imagem principal do stamp (ex.: assinatura + selo compostos); rubricas usam signImagePath. */
+    private ?string $mainImagePath = null;
+
     private const TSA_URL = 'http://timestamp.digicert.com';
 
     public function __construct(string $pdfDocument = '')
@@ -82,6 +85,11 @@ class SignPdfService
     public function setSignImage(string $path): void
     {
         $this->signImagePath = $path;
+    }
+
+    public function setMainImage(string $path): void
+    {
+        $this->mainImagePath = $path;
     }
 
     public function setLogoImage(string $path): void
@@ -189,6 +197,9 @@ class SignPdfService
             $signImg = null;
         }
 
+        // Principal pode ser a composição assinatura+selo; rubricas ficam só com a assinatura
+        $mainImg = $this->mainImagePath && file_exists($this->mainImagePath) ? $this->mainImagePath : $signImg;
+
         if ($this->pdfDocument !== '') {
             $this->pdf = $this->newPdf();
             $this->pdf->setPrintHeader(false);
@@ -202,31 +213,28 @@ class SignPdfService
                 $size = $this->pdf->getTemplateSize($template);
                 $this->pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
                 $this->pdf->useTemplate($template);
-                $this->stampPage($i, $signPage, $initialAllPages, $signImg, $signX, $signY, $signW, $signH, $withMainImage);
+                $this->stampPage($i, $signPage, $initialAllPages, $mainImg, $signImg, $signX, $signY, $signW, $signH, $withMainImage);
             }
         } else {
             $this->pdf->SetAutoPageBreak(false);
             $total = $this->pdf->getNumPages();
             for ($i = 1; $i <= $total; $i++) {
                 $this->pdf->setPage($i);
-                $this->stampPage($i, $signPage, $initialAllPages, $signImg, $signX, $signY, $signW, $signH, $withMainImage);
+                $this->stampPage($i, $signPage, $initialAllPages, $mainImg, $signImg, $signX, $signY, $signW, $signH, $withMainImage);
             }
         }
 
         return $this;
     }
 
-    private function stampPage(int $page, int $signPage, bool $initial, ?string $img, float $x, float $y, float $w, float $h, bool $withMainImage = true): void
+    private function stampPage(int $page, int $signPage, bool $initial, ?string $mainImg, ?string $rubricImg, float $x, float $y, float $w, float $h, bool $withMainImage = true): void
     {
-        if (! $img) {
-            return;
-        }
-
         if ($page === $signPage) {
-            if ($withMainImage) {
-                $this->pdf->Image($img, $x, $y, $w, $h);
+            if ($withMainImage && $mainImg) {
+                $this->pdf->Image($mainImg, $x, $y, $w, $h);
             }
-        } elseif ($initial) {
+        } elseif ($initial && $rubricImg) {
+            $img = $rubricImg;
             // Rubrica: versão reduzida da imagem no canto inferior direito
             $rw = $w * 0.5;
             $rh = $h * 0.5;
