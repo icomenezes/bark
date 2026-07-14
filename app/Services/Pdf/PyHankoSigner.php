@@ -128,6 +128,12 @@ class PyHankoSigner
      */
     private function repairForPyHanko(string $pdfIn): string
     {
+        // PDF já assinado: reescrever a estrutura via qpdf quebra a atualização
+        // incremental e invalida a cobertura de bytes da(s) assinatura(s) anterior(es).
+        if (self::isPdfSigned($pdfIn)) {
+            return $pdfIn;
+        }
+
         $qpdf = self::detectQpdf();
         if ($qpdf === null) {
             return $pdfIn;
