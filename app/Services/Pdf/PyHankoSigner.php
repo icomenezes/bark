@@ -157,10 +157,12 @@ class PyHankoSigner
     {
         $img = str_replace('\\', '/', realpath($signImage) ?: $signImage);
 
+        // border-width 0: sem a moldura preta padrão do stamp do pyHanko
         return "stamp-styles:\n"
             ."    appstamp:\n"
             ."        type: text\n"
             ."        stamp-text: \"\"\n"
+            ."        border-width: 0\n"
             ."        background: \"{$img}\"\n"
             ."        background-opacity: 1\n";
     }

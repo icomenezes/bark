@@ -2,7 +2,7 @@
 @section('title', 'Assinar Documento')
 
 @section('content')
-<div class="max-w-5xl mx-auto space-y-4">
+<div class="max-w-7xl mx-auto space-y-4">
 
     <div>
         <h1 class="text-xl font-semibold text-white">Assinar documento</h1>
@@ -40,8 +40,8 @@
             </p>
         </div>
     @else
-    <form method="POST" action="{{ route('sign-document.sign') }}" enctype="multipart/form-data"
-          class="bg-gray-900 rounded-lg border border-gray-800 p-6 space-y-6">
+    <form id="sign-form" method="POST" action="{{ route('sign-document.sign') }}" enctype="multipart/form-data"
+          class="lg:grid lg:grid-cols-3 lg:gap-6 lg:items-start space-y-4 lg:space-y-0">
         @csrf
 
         {{-- Posição da assinatura em pontos PDF, origem topo-esquerdo (preenchida pelo JS) --}}
@@ -50,29 +50,72 @@
         <input type="hidden" name="sign_w" id="sign_w" value="150">
         <input type="hidden" name="sign_h" id="sign_h" value="60">
         <input type="hidden" name="sign_page" id="sign_page" value="1">
+        <input type="hidden" name="drawn_signature" id="drawn_signature" value="">
 
-        <div>
-            <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider border-b border-gray-800 pb-2 mb-4">
-                Certificado
-            </h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Assinar com o certificado:</label>
-                    <select name="certificate_id" required
-                            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white
-                                   focus:outline-none focus:border-blue-500">
-                        <option value="">Selecione o certificado...</option>
-                        @foreach($certificates as $certificate)
-                            <option value="{{ $certificate->id }}" @selected(old('certificate_id') == $certificate->id)
-                                    @disabled($certificate->isExpired())>
-                                {{ $certificate->description }}
-                                @if($certificate->reference) — ref. {{ $certificate->reference }} @endif
-                                @if($certificate->isExpired()) (EXPIRADO) @endif
-                            </option>
-                        @endforeach
-                    </select>
+        {{-- Coluna esquerda: documento + preview --}}
+        <div class="lg:col-span-2 bg-gray-900 rounded-lg border border-gray-800 p-6 space-y-4">
+            <div>
+                <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider border-b border-gray-800 pb-2 mb-4">
+                    Documento
+                </h2>
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">PDF para assinar (máx. 15 MB):</label>
+                <input type="file" name="pdf" id="pdf-file" accept=".pdf"
+                       class="w-full text-sm text-gray-400 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0
+                              file:bg-gray-700 file:text-white file:text-sm hover:file:bg-gray-600
+                              bg-gray-800 border border-gray-700 rounded-lg">
+            </div>
+
+            <div>
+                <p class="text-xs text-gray-500 mb-3">
+                    Clique no documento para posicionar a assinatura. Arraste o marcador para reposicionar.
+                </p>
+
+                <div id="pdf-nav" class="hidden items-center gap-3 mb-3">
+                    <button type="button" id="pdf-prev"
+                            class="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-3 py-1.5 rounded-md transition-colors">
+                        ‹ Anterior
+                    </button>
+                    <span id="pdf-page-info" class="text-xs text-gray-400">Página 1 / 1</span>
+                    <button type="button" id="pdf-next"
+                            class="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-3 py-1.5 rounded-md transition-colors">
+                        Próxima ›
+                    </button>
                 </div>
-                <div class="flex items-end gap-6 pb-1">
+
+                <div id="pdf-wrapper" class="relative hidden overflow-hidden rounded-lg border border-gray-700 bg-gray-800"
+                     style="cursor:crosshair">
+                    <canvas id="pdf-canvas" class="block max-w-full"></canvas>
+                    <div id="sign-marker"
+                         style="position:absolute;border:2px dashed #e67e22;background:rgba(230,126,34,0.15);cursor:move;display:none;overflow:hidden;box-sizing:border-box">
+                        <div style="font-size:10px;color:#e67e22;padding:2px 4px;white-space:nowrap;pointer-events:none;user-select:none">
+                            ✍ Assinatura
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Coluna direita: painel de ações (fixo ao rolar) --}}
+        <div class="lg:sticky lg:top-4 bg-gray-900 rounded-lg border border-gray-800 p-6 space-y-5">
+            <div>
+                <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider border-b border-gray-800 pb-2 mb-4">
+                    Certificado
+                </h2>
+                <select name="certificate_id" required
+                        class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white
+                               focus:outline-none focus:border-blue-500">
+                    <option value="">Selecione o certificado...</option>
+                    @foreach($certificates as $certificate)
+                        <option value="{{ $certificate->id }}" @selected(old('certificate_id') == $certificate->id)
+                                @disabled($certificate->isExpired())>
+                            {{ $certificate->description }}
+                            @if($certificate->reference) — ref. {{ $certificate->reference }} @endif
+                            @if($certificate->isExpired()) (EXPIRADO) @endif
+                        </option>
+                    @endforeach
+                </select>
+
+                <div class="mt-3 space-y-2">
                     <label class="flex items-center gap-2 text-sm text-gray-300">
                         <input type="checkbox" name="initial_all_pages" value="1" checked
                                class="rounded bg-gray-800 border-gray-600 text-blue-600 focus:ring-blue-500">
@@ -85,68 +128,53 @@
                     </label>
                 </div>
             </div>
-        </div>
 
-        <div>
-            <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider border-b border-gray-800 pb-2 mb-4">
-                Documento
-            </h2>
-            <label class="block text-sm font-medium text-gray-300 mb-1.5">PDF para assinar (máx. 15 MB):</label>
-            <input type="file" name="pdf" id="pdf-file" accept=".pdf"
-                   class="w-full text-sm text-gray-400 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0
-                          file:bg-gray-700 file:text-white file:text-sm hover:file:bg-gray-600
-                          bg-gray-800 border border-gray-700 rounded-lg">
-        </div>
+            <div>
+                <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider border-b border-gray-800 pb-2 mb-4">
+                    Assinatura visual
+                </h2>
+                <div class="space-y-2">
+                    <label class="flex items-center gap-2 text-sm text-gray-300">
+                        <input type="radio" name="signature_mode" value="registered" checked
+                               class="bg-gray-800 border-gray-600 text-blue-600 focus:ring-blue-500">
+                        Imagem cadastrada no certificado
+                    </label>
+                    <label class="flex items-center gap-2 text-sm text-gray-300">
+                        <input type="radio" name="signature_mode" value="draw"
+                               class="bg-gray-800 border-gray-600 text-blue-600 focus:ring-blue-500">
+                        Desenhar assinatura agora
+                    </label>
+                </div>
 
-        <div>
-            <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider border-b border-gray-800 pb-2 mb-2">
-                Posicionar assinatura
-            </h2>
-            <p class="text-xs text-gray-500 mb-3">
-                Após escolher o PDF, clique no documento para posicionar a assinatura. Arraste o marcador para reposicionar.
-            </p>
-
-            <div id="pdf-nav" class="hidden items-center gap-3 mb-3">
-                <button type="button" id="pdf-prev"
-                        class="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-3 py-1.5 rounded-md transition-colors">
-                    ‹ Anterior
-                </button>
-                <span id="pdf-page-info" class="text-xs text-gray-400">Página 1 / 1</span>
-                <button type="button" id="pdf-next"
-                        class="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-3 py-1.5 rounded-md transition-colors">
-                    Próxima ›
-                </button>
-            </div>
-
-            <div id="pdf-wrapper" class="relative hidden overflow-hidden rounded-lg border border-gray-700 bg-gray-800"
-                 style="cursor:crosshair">
-                <canvas id="pdf-canvas" class="block max-w-full"></canvas>
-                <div id="sign-marker"
-                     style="position:absolute;border:2px dashed #e67e22;background:rgba(230,126,34,0.15);cursor:move;display:none;overflow:hidden;box-sizing:border-box">
-                    <div style="font-size:10px;color:#e67e22;padding:2px 4px;white-space:nowrap;pointer-events:none;user-select:none">
-                        ✍ Assinatura
+                <div id="sig-pad-box" class="hidden mt-3">
+                    <canvas id="sig-pad" width="600" height="240"
+                            class="w-full rounded-lg border border-gray-600 touch-none"
+                            style="background:#fff;height:140px;cursor:crosshair"></canvas>
+                    <div class="flex items-center justify-between mt-1.5">
+                        <p class="text-xs text-gray-500">Assine com o mouse ou o dedo</p>
+                        <button type="button" id="sig-clear" class="text-xs text-blue-400 hover:underline">Limpar</button>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="flex flex-col sm:flex-row items-stretch gap-3 pt-2 border-t border-gray-800">
-            <button type="submit"
-                    class="flex-1 flex items-center justify-center gap-2 bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                          d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
-                </svg>
-                Assinar PDF enviado
-            </button>
-            <button type="submit" formaction="{{ route('sign-document.generate') }}" formnovalidate
-                    class="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                </svg>
-                Gerar documento e assinar
-            </button>
+            <div class="space-y-2 pt-2 border-t border-gray-800">
+                <button type="submit"
+                        class="w-full flex items-center justify-center gap-2 bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                              d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                    </svg>
+                    Assinar PDF enviado
+                </button>
+                <button type="submit" formaction="{{ route('sign-document.generate') }}" formnovalidate
+                        class="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    Gerar documento e assinar
+                </button>
+            </div>
         </div>
     </form>
     @endif
@@ -244,12 +272,89 @@
         document.addEventListener('mouseup', function () { dragging = false; });
     }
 
+    // ─── Pad de assinatura (mouse/touch, fundo transparente no PNG exportado) ──
+
+    var sigHasStrokes = false;
+
+    function initSignaturePad() {
+        var pad = document.getElementById('sig-pad');
+        var box = document.getElementById('sig-pad-box');
+        var ctx = pad.getContext('2d');
+        var drawing = false;
+
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = '#1e3a8a';
+
+        function pos(e) {
+            var rect = pad.getBoundingClientRect();
+            var p = e.touches ? e.touches[0] : e;
+            return {
+                x: (p.clientX - rect.left) * (pad.width / rect.width),
+                y: (p.clientY - rect.top) * (pad.height / rect.height)
+            };
+        }
+
+        function start(e) {
+            drawing = true;
+            var p = pos(e);
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            e.preventDefault();
+        }
+
+        function move(e) {
+            if (!drawing) return;
+            var p = pos(e);
+            ctx.lineTo(p.x, p.y);
+            ctx.stroke();
+            sigHasStrokes = true;
+            e.preventDefault();
+        }
+
+        function end() { drawing = false; }
+
+        pad.addEventListener('mousedown', start);
+        pad.addEventListener('mousemove', move);
+        document.addEventListener('mouseup', end);
+        pad.addEventListener('touchstart', start, { passive: false });
+        pad.addEventListener('touchmove', move, { passive: false });
+        pad.addEventListener('touchend', end);
+
+        document.getElementById('sig-clear').addEventListener('click', function () {
+            ctx.clearRect(0, 0, pad.width, pad.height);
+            sigHasStrokes = false;
+        });
+
+        document.querySelectorAll('[name="signature_mode"]').forEach(function (radio) {
+            radio.addEventListener('change', function () {
+                box.classList.toggle('hidden', radio.value !== 'draw' || !radio.checked);
+            });
+        });
+
+        document.getElementById('sign-form').addEventListener('submit', function (e) {
+            var mode = document.querySelector('[name="signature_mode"]:checked');
+            if (mode && mode.value === 'draw') {
+                if (!sigHasStrokes) {
+                    e.preventDefault();
+                    alert('Desenhe a assinatura antes de assinar (ou escolha a imagem cadastrada).');
+                    return;
+                }
+                document.getElementById('drawn_signature').value = pad.toDataURL('image/png');
+            } else {
+                document.getElementById('drawn_signature').value = '';
+            }
+        });
+    }
+
     function init() {
         var fileInput = document.getElementById('pdf-file');
         if (!fileInput) return;
 
         var marker = document.getElementById('sign-marker');
         initDrag(marker);
+        initSignaturePad();
 
         // Preview direto do arquivo local — sem round-trip ao servidor
         fileInput.addEventListener('change', function () {

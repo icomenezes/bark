@@ -81,9 +81,17 @@ class SignDocumentController extends Controller
         $certificate = Certificate::find($request->certificate_id);
         abort_if($certificate === null || $certificate->user_id !== auth()->id(), 403);
 
+        $drawnTemp = null;
+
         try {
             $signer = PdfSignerService::fromCertificate($certificate);
             $position = $this->extractPosition($request);
+
+            // Assinatura desenhada na tela substitui a imagem cadastrada nesta operação
+            if ($request->input('signature_mode') === 'draw') {
+                $drawnTemp = $this->storeDrawnSignature((string) $request->input('drawn_signature'));
+                $signer->overrideSignImage($drawnTemp);
+            }
 
             $relative = $operation($signer, $position);
 
@@ -110,7 +118,34 @@ class SignDocumentController extends Controller
             return redirect()->route('sign-document.index')
                 ->with('error', 'Falha ao assinar: '.$e->getMessage())
                 ->withInput();
+        } finally {
+            if ($drawnTemp) {
+                @unlink($drawnTemp);
+            }
         }
+    }
+
+    /** Decodifica o data-URL PNG do pad de assinatura e grava em arquivo temporário. */
+    private function storeDrawnSignature(string $dataUrl): string
+    {
+        if (! str_starts_with($dataUrl, 'data:image/png;base64,')) {
+            throw new \RuntimeException('Assinatura desenhada inválida: desenhe novamente.');
+        }
+
+        $binary = base64_decode(substr($dataUrl, strlen('data:image/png;base64,')), true);
+
+        // Magic bytes PNG + limite de 2 MB decodificados
+        if ($binary === false || strlen($binary) > 2 * 1024 * 1024 || ! str_starts_with($binary, "\x89PNG\r\n\x1a\n")) {
+            throw new \RuntimeException('Assinatura desenhada inválida: desenhe novamente.');
+        }
+        if (getimagesizefromstring($binary) === false) {
+            throw new \RuntimeException('Assinatura desenhada inválida: desenhe novamente.');
+        }
+
+        $path = tempnam(sys_get_temp_dir(), 'drawn_sig_').'.png';
+        file_put_contents($path, $binary);
+
+        return $path;
     }
 
     private function positionRules(): array
@@ -121,6 +156,8 @@ class SignDocumentController extends Controller
             'sign_w' => ['nullable', 'numeric'],
             'sign_h' => ['nullable', 'numeric'],
             'sign_page' => ['nullable', 'integer', 'min:1'],
+            'signature_mode' => ['nullable', 'in:registered,draw'],
+            'drawn_signature' => ['nullable', 'string', 'required_if:signature_mode,draw'],
         ];
     }
 

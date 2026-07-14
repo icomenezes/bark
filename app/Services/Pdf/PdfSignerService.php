@@ -59,6 +59,12 @@ class PdfSignerService
         return $this->signImage !== null && file_exists($this->signImage);
     }
 
+    /** Substitui a imagem de assinatura desta operação (ex.: assinatura desenhada na hora). */
+    public function overrideSignImage(string $absolutePath): void
+    {
+        $this->signImage = $absolutePath;
+    }
+
     /** Motor que será usado nesta assinatura (para logs). */
     public function engine(): string
     {

@@ -114,6 +114,46 @@ class SignDocumentTest extends TestCase
         $this->assertStringContainsString('/ByteRange', Storage::disk('local')->get($relative));
     }
 
+    public function test_signs_with_drawn_signature(): void
+    {
+        Storage::fake('local');
+        $client = User::factory()->create(['role' => 'client']);
+        $certificate = $this->createRealCertificate($client);
+
+        // PNG 1x1 válido — o pad envia data-URL PNG do canvas
+        $drawn = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+        $response = $this->actingAs($client)->post('/sign-document/sign', [
+            'certificate_id' => $certificate->id,
+            'pdf' => new UploadedFile($this->makeSourcePdf(), 'doc.pdf', 'application/pdf', null, true),
+            'signature_mode' => 'draw',
+            'drawn_signature' => $drawn,
+        ]);
+
+        $response->assertRedirect(route('sign-document.index'))
+            ->assertSessionHas('signed_file')
+            ->assertSessionMissing('error')
+            ->assertSessionMissing('warning'); // assinatura desenhada conta como imagem visual
+
+        $relative = 'signed/'.$client->id.'/'.session('signed_file');
+        $this->assertStringContainsString('/ByteRange', Storage::disk('local')->get($relative));
+    }
+
+    public function test_invalid_drawn_signature_is_rejected(): void
+    {
+        Storage::fake('local');
+        $client = User::factory()->create(['role' => 'client']);
+        $certificate = $this->createRealCertificate($client);
+
+        $this->actingAs($client)->post('/sign-document/sign', [
+            'certificate_id' => $certificate->id,
+            'pdf' => new UploadedFile($this->makeSourcePdf(), 'doc.pdf', 'application/pdf', null, true),
+            'signature_mode' => 'draw',
+            'drawn_signature' => 'data:image/png;base64,not-a-png',
+        ])->assertRedirect(route('sign-document.index'))
+            ->assertSessionHas('error');
+    }
+
     public function test_signing_with_expired_certificate_fails_clearly(): void
     {
         Storage::fake('local');
