@@ -4,7 +4,9 @@ use App\Http\Controllers\Admin\AccessLogController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Client\CertificateController;
 use App\Http\Controllers\Client\DashboardController;
+use App\Http\Controllers\Client\SignDocumentController;
 use App\Http\Controllers\HeartbeatController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicRegisterController;
@@ -35,6 +37,19 @@ Route::middleware('auth')->post('/heartbeat', HeartbeatController::class)->name(
 // Client routes
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    // Certificados digitais
+    Route::resource('certificates', CertificateController::class)
+        ->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
+    Route::get('certificates/{certificate}/image/{type}', [CertificateController::class, 'image'])
+        ->whereIn('type', ['sign', 'logo'])
+        ->name('certificates.image');
+
+    // Assinatura de documentos
+    Route::get('sign-document', [SignDocumentController::class, 'index'])->name('sign-document.index');
+    Route::post('sign-document/sign', [SignDocumentController::class, 'sign'])->name('sign-document.sign');
+    Route::post('sign-document/generate', [SignDocumentController::class, 'generate'])->name('sign-document.generate');
+    Route::get('sign-document/download/{filename}', [SignDocumentController::class, 'download'])->name('sign-document.download');
 });
 
 // Cadastro público — recebe leads de site externo

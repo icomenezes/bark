@@ -3,7 +3,8 @@
 ## Visão geral
 Projeto **casca** (skeleton): base Laravel genérica para criar novos sistemas SaaS de qualquer nicho.
 Contém autenticação, usuários (admin/client), logs de acesso, sessões ativas com heartbeat,
-configurações white-label e notificações WhatsApp — **sem nenhum módulo de nicho**.
+configurações white-label, notificações WhatsApp e assinatura digital de PDF
+(certificados PFX + PAdES) — **sem nenhum módulo de nicho**.
 
 Fluxo de uso: clonar/copiar este projeto → renomear → adicionar os módulos do nicho
 (ex.: assinatura digital, agendamento) como novos controllers/models/views.
@@ -59,6 +60,17 @@ Set-Location "c:\projetos\casca"
 
 Usuário é considerado online se `last_seen_at >= now - 2 minutos`.
 
+### `certificates`
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| user_id | FK | Dono do certificado (cliente) |
+| description / reference | string | Referência é opcional |
+| pfx_path | string | Disk `local` (privado), `certificates/{id}/certificate.pfx` |
+| password | text | Cast `encrypted`; validada contra o PFX no upload |
+| sign_image_path / logo_image_path | string nullable | Carimbo visual e logo |
+| expires_at | date nullable | `validTo` do X.509, extraído no upload |
+
 ### `settings`
 Registro único (singleton via `Setting::current()`, cacheado 5 min):
 `company_name`, `logo_url`, `favicon_url`, `primary_color`, `accent_color`,
@@ -87,6 +99,8 @@ Alias `admin` registrado em `bootstrap/app.php`. Login redireciona admin → `ad
 - `/admin/access-logs` — logs com filtro por usuário/evento/data
 - `/admin/settings` — white-label
 - `/dashboard` — área do cliente (placeholder para módulos)
+- `/certificates` — CRUD de certificados digitais do cliente (+ `certificates/{id}/image/{sign|logo}`)
+- `/sign-document` — assinar PDF (preview PDF.js + marcador); POST `sign` / `generate`; GET `download/{file}`
 - `POST /heartbeat` — atualiza `active_sessions.last_seen_at`
 - `POST /api/register` — registro público de leads (sem CSRF)
 - `/profile` — perfil Breeze
@@ -99,6 +113,22 @@ Alias `admin` registrado em `bootstrap/app.php`. Login redireciona admin → `ad
 - `NotificationService` — `sendWhatsApp($user, $msg)`, `boasVindas($user)` (respeita `settings.whatsapp_enabled`)
 - `WhatsAppService` — Evolution API (`services.evolution.*` no config, env `EVOLUTION_API_*`)
 - `Mail\BoasVindas` — e-mail de boas-vindas (view `emails.boas-vindas`, layout `emails.layout`)
+
+### Assinatura digital de PDF (`app/Services/Pdf/`)
+
+Porte do módulo do ERP (`erp.fitlikeaglove.com.br`) — spec em
+`docs/superpowers/specs/2026-07-14-certificates-sign-document-design.md`.
+
+- `PdfSignerService` — fachada: `fromCertificate()`, `signExisting()`, `createAndSign()`, `hasSignatureImage()`
+- `PyHankoSigner` — motor preferencial (PAdES incremental, multi-assinatura, TSA embutido).
+  Requer pyHanko CLI no host (`pip install pyHanko pyHanko-cli "pyHanko[image-support]"`);
+  override do binário via env `PYHANKO_BIN` (`services.pyhanko.bin`). **Nunca cachear detecção negativa.**
+- `SignPdfService` — motor TCPDF+FPDI (fallback): assinatura única, reescreve o PDF, TSA vira sidecar `.tsr`.
+  PEM cru no `setSignature` (prefixo `data://` quebra em silêncio); posições em pontos PDF
+  convertidas por `getScaleFactor()`; `stamp()` jamais sobre PDF já assinado.
+- Coordenadas: form → backend em pontos PDF origem topo-esquerdo; pyHanko usa base-esquerda
+  (`y1 = alturaPagina − y − h`, conversão em `PyHankoSigner::fieldSpec()`).
+- Saída assinada: disk `local` em `signed/{user_id}/doc_<hex>.pdf`.
 
 ---
 

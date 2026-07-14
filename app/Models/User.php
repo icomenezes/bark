@@ -20,7 +20,7 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'password'          => 'hashed',
+            'password' => 'hashed',
         ];
     }
 
@@ -46,6 +46,7 @@ class User extends Authenticatable
     public function isOnline(): bool
     {
         $session = $this->activeSession;
+
         return $session !== null && $session->isOnline();
     }
 
@@ -54,5 +55,12 @@ class User extends Authenticatable
     public function accessLogs()
     {
         return $this->hasMany(AccessLog::class)->latest('created_at');
+    }
+
+    // ── Certificados digitais ────────────────────────────────────────────────
+
+    public function certificates()
+    {
+        return $this->hasMany(Certificate::class);
     }
 }

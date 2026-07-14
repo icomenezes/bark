@@ -36,9 +36,14 @@ return [
     ],
 
     'evolution' => [
-        'url'      => env('EVOLUTION_API_URL'),
+        'url' => env('EVOLUTION_API_URL'),
         'instance' => env('EVOLUTION_API_INSTANCE'),
-        'key'      => env('EVOLUTION_API_KEY'),
+        'key' => env('EVOLUTION_API_KEY'),
+    ],
+
+    // Assinatura PAdES — caminho do binário pyHanko (opcional; sem ele usa fallback TCPDF)
+    'pyhanko' => [
+        'bin' => env('PYHANKO_BIN'),
     ],
 
 ];

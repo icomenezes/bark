@@ -47,6 +47,16 @@
                       {{ request()->routeIs('dashboard') ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800' }}">
                 Início
             </a>
+            <a href="{{ route('certificates.index') }}"
+               class="px-3 py-2 rounded-md text-sm transition-colors
+                      {{ request()->routeIs('certificates.*') ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800' }}">
+                Certificados
+            </a>
+            <a href="{{ route('sign-document.index') }}"
+               class="px-3 py-2 rounded-md text-sm transition-colors
+                      {{ request()->routeIs('sign-document.*') ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800' }}">
+                Assinar Documento
+            </a>
         </nav>
 
         <div class="ml-auto flex items-center gap-3">
@@ -89,6 +99,16 @@
     </div>
 
     <main class="flex-1 p-6">
+        @if(session('success'))
+            <div class="mb-6 flex items-center gap-3 bg-green-900/40 border border-green-700 text-green-300 px-4 py-3 rounded text-sm max-w-3xl">
+                {{ session('success') }}
+            </div>
+        @endif
+        @if(session('warning'))
+            <div class="mb-6 flex items-center gap-3 bg-yellow-900/40 border border-yellow-700 text-yellow-300 px-4 py-3 rounded text-sm max-w-3xl">
+                {{ session('warning') }}
+            </div>
+        @endif
         @if(session('error'))
             <div class="mb-6 flex items-center gap-3 bg-red-900/40 border border-red-700 text-red-300 px-4 py-3 rounded text-sm max-w-3xl">
                 {{ session('error') }}
