@@ -23,6 +23,8 @@ class PyHankoSigner
 
     private static ?string $binary = null;
 
+    private static ?string $qpdfBinary = null;
+
     public static function available(): bool
     {
         return self::binary() !== null;
@@ -49,6 +51,10 @@ class PyHankoSigner
         if (! file_exists($pfxPath)) {
             throw new \RuntimeException('Arquivo PFX não encontrado: '.$pfxPath);
         }
+
+        $originalPdfIn = $pdfIn;
+        $pdfIn = $this->repairForPyHanko($pdfIn);
+        $repairedTemp = $pdfIn !== $originalPdfIn ? $pdfIn : null;
 
         // Valida a senha antes: o erro da CLI para PFX inválido é genérico.
         // PFX legado (RC2/3DES) é convertido e a CLI recebe o arquivo moderno.
@@ -103,10 +109,70 @@ class PyHankoSigner
         if ($tempPfx) {
             @unlink($tempPfx);
         }
+        if ($repairedTemp) {
+            @unlink($repairedTemp);
+        }
 
         if ($code !== 0 || ! file_exists($pdfOut) || filesize($pdfOut) === 0) {
             throw new \RuntimeException('pyHanko falhou (código '.$code.'): '.implode(' | ', array_slice($output, -5)));
         }
+    }
+
+    /**
+     * O TCPDF/FPDI reescreve o PDF ao estampar rubricas e o resultado, embora
+     * abra normalmente em leitores tolerantes, às vezes sai com a tabela xref
+     * mal formada para o parser estrito do pyHanko ("Could not find xref table
+     * at specified location"). O qpdf reescreve/repara essa estrutura antes da
+     * assinatura. Sem qpdf disponível, segue com o arquivo original — pyHanko
+     * ainda pode lê-lo se ele não tiver esse defeito.
+     */
+    private function repairForPyHanko(string $pdfIn): string
+    {
+        $qpdf = self::detectQpdf();
+        if ($qpdf === null) {
+            return $pdfIn;
+        }
+
+        $tmp = tempnam(sys_get_temp_dir(), 'pyh_repaired_').'.pdf';
+        $cmd = escapeshellarg($qpdf).' '.escapeshellarg($pdfIn).' '.escapeshellarg($tmp).' 2>&1';
+        exec($cmd, $output, $code);
+
+        if ($code !== 0 || ! file_exists($tmp) || filesize($tmp) === 0) {
+            @unlink($tmp);
+
+            return $pdfIn;
+        }
+
+        return $tmp;
+    }
+
+    /** Mesma lógica de "não cacheia negativo" de binary(), aplicada ao qpdf. */
+    private static function detectQpdf(): ?string
+    {
+        if (self::$qpdfBinary !== null) {
+            return self::$qpdfBinary;
+        }
+
+        $configured = config('services.qpdf.bin') ?: getenv('QPDF_BIN');
+        if ($configured && file_exists($configured)) {
+            return self::$qpdfBinary = $configured;
+        }
+
+        $isWin = DIRECTORY_SEPARATOR === '\\';
+        $cmd = $isWin ? 'where qpdf 2>NUL' : 'which qpdf 2>/dev/null';
+        exec($cmd, $out, $code);
+        if ($code === 0 && ! empty($out[0]) && file_exists(trim($out[0]))) {
+            return self::$qpdfBinary = trim($out[0]);
+        }
+
+        if ($isWin) {
+            $glob = glob('C:/Program Files/qpdf */bin/qpdf.exe') ?: [];
+            if (! empty($glob[0])) {
+                return self::$qpdfBinary = $glob[0];
+            }
+        }
+
+        return null;
     }
 
     /**

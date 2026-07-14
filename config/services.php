@@ -51,4 +51,9 @@ return [
         'bin' => env('OPENSSL_BIN'),
     ],
 
+    // CLI qpdf para reparar a tabela xref de PDFs gerados pelo TCPDF (parser do pyHanko é estrito)
+    'qpdf' => [
+        'bin' => env('QPDF_BIN'),
+    ],
+
 ];
