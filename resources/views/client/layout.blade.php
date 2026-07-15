@@ -26,7 +26,8 @@
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen flex flex-col">
 
-    <header class="relative bg-gray-900 border-b border-gray-800 px-6 py-4 flex items-center gap-4" x-data="{ mobileNavOpen: false }">
+    <div x-data="{ mobileNavOpen: false }">
+    <header class="bg-gray-900 border-b border-gray-800 px-6 py-4 flex items-center gap-4">
         <div class="flex items-center gap-3">
             @if($settings->logo_url ?? false)
                 <img src="{{ $settings->logo_url }}" alt="{{ $settings->company_name }}" class="h-7 w-auto object-contain">
@@ -85,9 +86,10 @@
                 </svg>
             </button>
         </div>
+    </header>
 
         <div x-show="mobileNavOpen" x-cloak @click.outside="mobileNavOpen = false"
-             class="md:hidden absolute top-full left-0 right-0 bg-gray-900 border-b border-gray-800 px-4 py-3 space-y-1 z-50">
+             class="md:hidden bg-gray-900 border-b border-gray-800 px-4 py-3 space-y-1">
             <a href="{{ route('dashboard') }}"
                class="block px-3 py-2 rounded-md text-sm transition-colors
                       {{ request()->routeIs('dashboard') ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800' }}">
@@ -119,7 +121,7 @@
                 </button>
             </form>
         </div>
-    </header>
+    </div>
 
     {{-- Banner "Adicionar à tela inicial" --}}
     <div id="pwa-banner" class="hidden fixed bottom-0 left-0 right-0 z-50 bg-gray-900 border-t border-gray-700 px-4 py-3 flex items-center gap-3 shadow-lg">
