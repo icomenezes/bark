@@ -255,6 +255,7 @@
 @endsection
 
 @push('scripts')
+@include('client.partials.pdfjs-loader')
 <script>
 (function () {
     var pdfDoc = null;
@@ -262,16 +263,7 @@
     var totalPages = 1;
     var scale = 1;
 
-    function loadPdfJs(cb) {
-        if (window.pdfjsLib) { cb(); return; }
-        var s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-        s.onload = function () {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-            cb();
-        };
-        document.head.appendChild(s);
-    }
+    var loadPdfJs = window.loadPdfJs;
 
     function getField(name) { return document.getElementById(name).value; }
     function setField(name, val) { document.getElementById(name).value = val; }

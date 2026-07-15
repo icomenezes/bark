@@ -58,6 +58,11 @@
                       {{ request()->routeIs('sign-document.*') ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800' }}">
                 Assinar Documento
             </a>
+            <a href="{{ route('envelopes.index') }}"
+               class="px-3 py-2 rounded-md text-sm transition-colors
+                      {{ request()->routeIs('envelopes.*') ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800' }}">
+                Envelopes
+            </a>
         </nav>
 
         <div class="ml-auto flex items-center gap-3">
@@ -104,6 +109,11 @@
                class="block px-3 py-2 rounded-md text-sm transition-colors
                       {{ request()->routeIs('sign-document.*') ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800' }}">
                 Assinar Documento
+            </a>
+            <a href="{{ route('envelopes.index') }}"
+               class="block px-3 py-2 rounded-md text-sm transition-colors
+                      {{ request()->routeIs('envelopes.*') ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800' }}">
+                Envelopes
             </a>
             <a href="{{ route('profile.edit') }}"
                class="block px-3 py-2 rounded-md text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">

@@ -109,6 +109,18 @@ class EnvelopeControllerTest extends TestCase
         $this->actingAs($owner)->post("/envelopes/{$envelope->id}/cancel")->assertSessionHasErrors();
     }
 
+    public function test_index_and_show_render_envelope_data(): void
+    {
+        $owner = User::factory()->create(['role' => 'client']);
+        $envelope = Envelope::factory()->for($owner)->create(['title' => 'Contrato Visível', 'status' => 'sent']);
+        EnvelopeSigner::factory()->for($envelope)->create(['name' => 'Ana Signatária', 'status' => 'notified']);
+
+        $this->actingAs($owner)->get('/envelopes')->assertOk()->assertSee('Contrato Visível');
+        $this->actingAs($owner)->get("/envelopes/{$envelope->id}")
+            ->assertOk()->assertSee('Ana Signatária')->assertSee('Aguardando assinaturas');
+        $this->actingAs($owner)->get('/envelopes/create')->assertOk()->assertSee('signers_json', false);
+    }
+
     public function test_reseal_dispatches_job_when_all_signed(): void
     {
         Queue::fake();
