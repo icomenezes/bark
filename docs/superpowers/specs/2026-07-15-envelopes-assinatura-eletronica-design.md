@@ -170,19 +170,19 @@ OTP quando o signatário tem número. OTP por WhatsApp usa exclusivamente o What
 Ciclo de vida:
 - Reenvio manual de convite no `show` (v1; lembrete automático fica para v2)
 - Command `envelopes:expire` no scheduler: envelopes `sent` com `expires_at` vencido → `expired`, evento registrado
-- Eventos do remetente também vão ao `AccessLogService` (`envelope_created`, `envelope_completed`, `envelope_declined`)
+- `envelope_created` do remetente também vai ao `AccessLogService`; conclusão/recusa ficam registradas na trilha própria do envelope (`envelope_events`)
 
 ## Componentes novos
 
 ```
 app/Models/Envelope.php, EnvelopeSigner.php, EnvelopeField.php, EnvelopeEvent.php
 app/Http/Controllers/Client/EnvelopeController.php
-app/Http/Controllers/Public/SignEnvelopeController.php
+app/Http/Controllers/PublicSign/SignEnvelopeController.php
 app/Services/Envelope/EnvelopeService.php        — criação, envio, transições de status, eventos
 app/Services/Envelope/EvidenceReportGenerator.php — página de evidências (TCPDF)
 app/Jobs/SealEnvelopeJob.php
 app/Console/Commands/ExpireEnvelopes.php
-Mailables: EnvelopeInvite, EnvelopeOtp, EnvelopeReminder, EnvelopeCompleted, EnvelopeDeclined, EnvelopeCancelled
+Mailables: EnvelopeInvite (com modo lembrete via flag), EnvelopeOtp, EnvelopeCompleted, EnvelopeDeclined, EnvelopeCancelled
 Views: client/envelopes/{index,create,show}.blade.php, public/sign/{show,done,unavailable}.blade.php
 ```
 
