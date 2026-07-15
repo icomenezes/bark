@@ -141,6 +141,43 @@ Porte do módulo do ERP (`erp.fitlikeaglove.com.br`) — spec em
 
 ---
 
+## Envelopes (assinatura eletrônica multi-signatário)
+
+Cliente envia um PDF para N destinatários assinarem eletronicamente (sem certificado) via link
+único por e-mail; ao final o sistema anexa página de evidências e lacra com o certificado A1 da
+plataforma. Spec: `docs/superpowers/specs/2026-07-15-envelopes-assinatura-eletronica-design.md`.
+
+### Tabelas
+- `envelopes` — user_id, title, message, original/final_pdf_path, sha256_original/final,
+  `signing_order` (`parallel`|`sequential`), `status` (`draft`|`sent`|`completed`|`declined`|`cancelled`|`expired`), expires_at, completed_at
+- `envelope_signers` — envelope_id, name, email, whatsapp, cpf, `auth_method` (`link`|`email_otp`|`whatsapp_otp`),
+  sign_position, `token` (64, único, link público), `status` (`pending`|`notified`|`viewed`|`signed`|`declined`),
+  signature_image_path, signature_type, otp_* (hash, expira 10 min, 5 tentativas), signed_at, ip/user_agent, decline_reason
+- `envelope_fields` — posições de assinatura por signer (page, x, y, w, h em pontos PDF topo-esquerdo)
+- `envelope_events` — trilha de auditoria **imutável** (só INSERT, `UPDATED_AT = null`)
+
+### Rotas
+- Cliente (`auth`): `/envelopes` index/create/store/show + `remind`/`cancel`/`reseal`/`download`
+- Públicas (autorização = token, com throttle): `GET /sign/{token}` (show), `GET /sign/{token}/document`,
+  `POST /sign/{token}/otp`, `POST /sign/{token}` (assinar), `POST /sign/{token}/decline`
+
+### Serviços (`app/Services/Envelope/`)
+- `EnvelopeService` — create/send/notifySigner/markViewed/issueOtp/verifyOtp/sign/decline/cancel/recordEvent
+- `EvidenceReportGenerator` — página(s) de evidências (TCPDF, unidade pt)
+- `EnvelopePdfComposer` — original + carimbos (FPDI pt, aplicação direta) + evidências; **nunca** sobre PDF já assinado
+- `SealEnvelopeJob` — quando todos assinam: compõe + assina via `PdfSignerService` com o certificado
+  da plataforma (`settings.platform_certificate_id`, configurável em `/admin/settings`); saída em
+  `signed/envelopes/{id}/final.pdf`; falha gera evento `seal_failed` (botão "Reprocessar lacre" no show)
+
+### Regras
+- `send()` exige certificado da plataforma configurado e não vencido
+- Assinaturas de convidados são só dados (PNG em `envelopes/{id}/signatures/` + eventos); o PDF é
+  modificado uma única vez, no lacre
+- Recusa de qualquer signatário encerra o envelope inteiro
+- Command `envelopes:expire` (agendado de hora em hora em `routes/console.php`) expira envelopes `sent` vencidos
+
+---
+
 ## Layouts
 
 - `resources/views/admin/layout.blade.php` — sidebar admin (Dashboard, Usuários, Logs, Configurações) + heartbeat
