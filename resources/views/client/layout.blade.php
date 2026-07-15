@@ -26,7 +26,7 @@
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen flex flex-col">
 
-    <header class="bg-gray-900 border-b border-gray-800 px-6 py-4 flex items-center gap-4">
+    <header class="relative bg-gray-900 border-b border-gray-800 px-6 py-4 flex items-center gap-4" x-data="{ mobileNavOpen: false }">
         <div class="flex items-center gap-3">
             @if($settings->logo_url ?? false)
                 <img src="{{ $settings->logo_url }}" alt="{{ $settings->company_name }}" class="h-7 w-auto object-contain">
@@ -63,10 +63,54 @@
             <a href="{{ route('profile.edit') }}" class="text-sm text-gray-400 hover:text-white transition-colors hidden sm:block">
                 {{ auth()->user()->name }}
             </a>
-            <form method="POST" action="{{ route('logout') }}">
+            <form method="POST" action="{{ route('logout') }}" class="hidden md:block">
                 @csrf
                 <button type="submit"
                         class="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                    </svg>
+                    Sair
+                </button>
+            </form>
+
+            <button type="button" @click="mobileNavOpen = !mobileNavOpen"
+                    class="md:hidden text-gray-400 hover:text-white transition-colors p-1">
+                <svg x-show="!mobileNavOpen" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+                <svg x-show="mobileNavOpen" x-cloak class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        <div x-show="mobileNavOpen" x-cloak @click.outside="mobileNavOpen = false"
+             class="md:hidden absolute top-full left-0 right-0 bg-gray-900 border-b border-gray-800 px-4 py-3 space-y-1 z-50">
+            <a href="{{ route('dashboard') }}"
+               class="block px-3 py-2 rounded-md text-sm transition-colors
+                      {{ request()->routeIs('dashboard') ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800' }}">
+                Início
+            </a>
+            <a href="{{ route('certificates.index') }}"
+               class="block px-3 py-2 rounded-md text-sm transition-colors
+                      {{ request()->routeIs('certificates.*') ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800' }}">
+                Certificados
+            </a>
+            <a href="{{ route('sign-document.index') }}"
+               class="block px-3 py-2 rounded-md text-sm transition-colors
+                      {{ request()->routeIs('sign-document.*') ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800' }}">
+                Assinar Documento
+            </a>
+            <a href="{{ route('profile.edit') }}"
+               class="block px-3 py-2 rounded-md text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
+                {{ auth()->user()->name }}
+            </a>
+            <form method="POST" action="{{ route('logout') }}">
+                @csrf
+                <button type="submit"
+                        class="w-full text-left px-3 py-2 rounded-md text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors flex items-center gap-1.5">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                               d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>

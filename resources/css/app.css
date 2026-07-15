@@ -6,4 +6,8 @@
     form {
         display: contents;
     }
+
+    [x-cloak] {
+        display: none !important;
+    }
 }
