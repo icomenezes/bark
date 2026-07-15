@@ -200,7 +200,7 @@ class SignDocumentController extends Controller
 
     private function documentHeader(): array
     {
-        return ['title' => 'DOCUMENTO', 'subtitle' => 'Gerado em '.now()->format('d/m/Y H:i')];
+        return [];
     }
 
     /** Texto digitado pelo usuário → HTML seguro para o TCPDF (writeHTMLCell); vazio cai no template de demonstração. */

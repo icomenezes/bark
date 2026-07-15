@@ -112,6 +112,9 @@ class SignPdfService
             $this->pdf->setHeaderFont([PDF_FONT_NAME_MAIN, '', 15]);
             $this->pdf->setFooterFont([PDF_FONT_NAME_DATA, '', PDF_FONT_SIZE_DATA]);
             $this->pdf->SetDefaultMonospacedFont(PDF_FONT_MONOSPACED);
+        } else {
+            $this->pdf->setPrintHeader(false);
+            $this->pdf->setPrintFooter(false);
         }
 
         $this->pdf->SetMargins(PDF_MARGIN_LEFT, PDF_MARGIN_TOP, PDF_MARGIN_RIGHT);
