@@ -1,6 +1,6 @@
-# Envelopes — Assinatura Eletrônica Multi-Signatário — Implementation Plan
+﻿# Envelopes — Assinatura Eletrônica Multi-Signatário — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Cliente envia um PDF para N destinatários por e-mail; cada um assina eletronicamente (sem certificado) via link único; ao final o sistema anexa página de evidências e lacra com o certificado A1 da plataforma.
 
@@ -39,7 +39,7 @@
 - Produces: `EnvelopeSigner` (relations `envelope()`, `fields()`; token auto-gerado em `creating`; helpers `requiresOtp(): bool`, `canSign(): bool`)
 - Produces: `EnvelopeEvent` (`UPDATED_AT = null`, cast `meta` array)
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [x] **Step 1: Escrever os testes que falham**
 
 ```php
 <?php
@@ -126,12 +126,12 @@ class EnvelopeModelTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `& $php artisan test --filter=EnvelopeModelTest`
 Expected: FAIL (classes/tabelas inexistentes)
 
-- [ ] **Step 3: Criar as migrations**
+- [x] **Step 3: Criar as migrations**
 
 ```php
 <?php
@@ -274,7 +274,7 @@ return new class extends Migration
 };
 ```
 
-- [ ] **Step 4: Criar os models**
+- [x] **Step 4: Criar os models**
 
 ```php
 <?php
@@ -486,7 +486,7 @@ class EnvelopeEvent extends Model
 }
 ```
 
-- [ ] **Step 5: Criar as factories**
+- [x] **Step 5: Criar as factories**
 
 ```php
 <?php
@@ -539,12 +539,12 @@ class EnvelopeSignerFactory extends Factory
 }
 ```
 
-- [ ] **Step 6: Rodar e ver passar**
+- [x] **Step 6: Rodar e ver passar**
 
 Run: `& $php artisan test --filter=EnvelopeModelTest`
 Expected: PASS (5 testes)
 
-- [ ] **Step 7: Rodar a suíte inteira e commitar**
+- [x] **Step 7: Rodar a suíte inteira e commitar**
 
 Run: `& $php artisan test`
 Expected: PASS (nenhuma regressão)
@@ -568,7 +568,7 @@ git commit -m "feat: tabelas e models do modulo de envelopes"
 **Interfaces:**
 - Produces: `Setting::platformCertificate(): BelongsTo` (nullable) — usada pelo `SealEnvelopeJob` (Task 9) e pela validação de envio (Task 5) via `Setting::current()->platformCertificate`.
 
-- [ ] **Step 1: Teste que falha**
+- [x] **Step 1: Teste que falha**
 
 ```php
 <?php
@@ -620,12 +620,12 @@ class PlatformCertificateSettingTest extends TestCase
 
 Nota: antes de escrever, abrir `SettingController::update` e copiar os campos realmente obrigatórios do validate existente para o payload dos testes (ajustar se `company_name`/cores não forem required).
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `& $php artisan test --filter=PlatformCertificateSettingTest`
 Expected: FAIL (coluna inexistente / validação ausente)
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 Migration:
 
@@ -686,12 +686,12 @@ View `admin/settings/edit.blade.php` — adicionar junto aos demais campos (mesm
 </div>
 ```
 
-- [ ] **Step 4: Rodar e ver passar + suíte**
+- [x] **Step 4: Rodar e ver passar + suíte**
 
 Run: `& $php artisan test --filter=PlatformCertificateSettingTest` → PASS
 Run: `& $php artisan test` → PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add database/migrations app/Models/Setting.php app/Http/Controllers/Admin/SettingController.php resources/views/admin/settings tests/Feature/PlatformCertificateSettingTest.php
@@ -710,7 +710,7 @@ git commit -m "feat: certificado da plataforma configuravel em settings"
 **Interfaces:**
 - Produces: `SignatureImage::storeDataUrl(string $dataUrl): string` — valida data-URL PNG (magic bytes, ≤ 2 MB decodificado, `getimagesizefromstring`) e grava em arquivo temporário; lança `RuntimeException('Assinatura desenhada inválida: desenhe novamente.')` se inválido. Usada pelo SignDocumentController (existente) e pelo fluxo público (Task 12).
 
-- [ ] **Step 1: Teste que falha**
+- [x] **Step 1: Teste que falha**
 
 ```php
 <?php
@@ -755,12 +755,12 @@ class SignatureImageTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `& $php artisan test --filter=SignatureImageTest`
 Expected: FAIL (classe não existe)
 
-- [ ] **Step 3: Implementar — mover o corpo de `storeDrawnSignature` para a classe**
+- [x] **Step 3: Implementar — mover o corpo de `storeDrawnSignature` para a classe**
 
 ```php
 <?php
@@ -805,12 +805,12 @@ private function storeDrawnSignature(string $dataUrl): string
 }
 ```
 
-- [ ] **Step 4: Rodar e ver passar (incluindo SignDocumentTest)**
+- [x] **Step 4: Rodar e ver passar (incluindo SignDocumentTest)**
 
 Run: `& $php artisan test --filter="SignatureImageTest|SignDocumentTest"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/Support/SignatureImage.php app/Http/Controllers/Client/SignDocumentController.php tests/Unit/SignatureImageTest.php
@@ -836,7 +836,7 @@ git commit -m "refactor: extrai validacao de assinatura desenhada para Signature
   - `new EnvelopeDeclined(Envelope $envelope, EnvelopeSigner $signer)` — para o remetente
   - `new EnvelopeCancelled(Envelope $envelope)` — para signatários já notificados
 
-- [ ] **Step 1: Teste que falha**
+- [x] **Step 1: Teste que falha**
 
 ```php
 <?php
@@ -908,12 +908,12 @@ Route::get('/sign/{token}', fn () => abort(501))->name('public.sign.show');
 Route::get('/sign/{token}/document', fn () => abort(501))->name('public.sign.document');
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `& $php artisan test --filter=EnvelopeMailablesTest`
 Expected: FAIL (mailables não existem)
 
-- [ ] **Step 3: Implementar mailables**
+- [x] **Step 3: Implementar mailables**
 
 Todos seguem o padrão do `BoasVindas` (`use Queueable, SerializesModels`). Código completo:
 
@@ -1077,7 +1077,7 @@ class EnvelopeCancelled extends Mailable
 }
 ```
 
-- [ ] **Step 4: Views de e-mail**
+- [x] **Step 4: Views de e-mail**
 
 Padrão standalone do `emails/boas-vindas.blade.php` (copiar o mesmo `<head>`/CSS de lá; abaixo só o miolo `.body` de cada uma):
 
@@ -1137,7 +1137,7 @@ Padrão standalone do `emails/boas-vindas.blade.php` (copiar o mesmo `<head>`/CS
    O link de assinatura que você recebeu não é mais válido.</p>
 ```
 
-- [ ] **Step 5: `NotificationService::sendWhatsAppTo`**
+- [x] **Step 5: `NotificationService::sendWhatsAppTo`**
 
 ```php
 // app/Services/NotificationService.php — refatorar para:
@@ -1163,12 +1163,12 @@ public function sendWhatsAppTo(?string $number, string $message): void
 }
 ```
 
-- [ ] **Step 6: Rodar e ver passar + suíte**
+- [x] **Step 6: Rodar e ver passar + suíte**
 
 Run: `& $php artisan test --filter=EnvelopeMailablesTest` → PASS
 Run: `& $php artisan test` → PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add app/Mail/Envelopes resources/views/emails/envelopes app/Services/NotificationService.php routes/web.php tests/Feature/EnvelopeMailablesTest.php
@@ -1191,7 +1191,7 @@ git commit -m "feat: mailables e e-mails do modulo de envelopes"
   - `notifySigner(EnvelopeSigner $signer, bool $reminder = false): void` — e-mail convite + espelho WhatsApp; status `notified` (se ainda `pending`); evento `sent`/`reminder_sent`.
   - `recordEvent(Envelope $envelope, ?EnvelopeSigner $signer, string $event, ?string $ip = null, ?string $userAgent = null, array $meta = []): EnvelopeEvent`
 
-- [ ] **Step 1: Teste que falha**
+- [x] **Step 1: Teste que falha**
 
 ```php
 <?php
@@ -1293,12 +1293,12 @@ class EnvelopeServiceCreateTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `& $php artisan test --filter=EnvelopeServiceCreateTest`
 Expected: FAIL (serviço não existe)
 
-- [ ] **Step 3: Implementar o serviço**
+- [x] **Step 3: Implementar o serviço**
 
 ```php
 <?php
@@ -1414,12 +1414,12 @@ class EnvelopeService
 }
 ```
 
-- [ ] **Step 4: Rodar e ver passar + suíte**
+- [x] **Step 4: Rodar e ver passar + suíte**
 
 Run: `& $php artisan test --filter=EnvelopeServiceCreateTest` → PASS
 Run: `& $php artisan test` → PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/Services/Envelope/EnvelopeService.php tests/Feature/EnvelopeServiceCreateTest.php
@@ -1444,7 +1444,7 @@ git commit -m "feat: EnvelopeService - criacao, envio e trilha de eventos"
   - `decline(EnvelopeSigner $signer, string $reason, ?string $ip, ?string $userAgent): void` — signer e envelope `declined`, e-mail ao remetente, evento
   - `cancel(Envelope $envelope): void` — status `cancelled`, evento, e-mail `EnvelopeCancelled` aos signers com status ≠ `pending`
 
-- [ ] **Step 1: Criar a casca do job (para o dispatch compilar)**
+- [x] **Step 1: Criar a casca do job (para o dispatch compilar)**
 
 ```php
 <?php
@@ -1469,7 +1469,7 @@ class SealEnvelopeJob implements ShouldQueue
 }
 ```
 
-- [ ] **Step 2: Teste que falha**
+- [x] **Step 2: Teste que falha**
 
 ```php
 <?php
@@ -1609,12 +1609,12 @@ class EnvelopeServiceSignTest extends TestCase
 }
 ```
 
-- [ ] **Step 3: Rodar e ver falhar**
+- [x] **Step 3: Rodar e ver falhar**
 
 Run: `& $php artisan test --filter=EnvelopeServiceSignTest`
 Expected: FAIL (métodos não existem)
 
-- [ ] **Step 4: Implementar os métodos (adicionar à classe da Task 5)**
+- [x] **Step 4: Implementar os métodos (adicionar à classe da Task 5)**
 
 ```php
 // adicionar aos use: App\Jobs\SealEnvelopeJob, App\Mail\Envelopes\{EnvelopeCancelled,EnvelopeCompleted,EnvelopeDeclined,EnvelopeOtp},
@@ -1724,12 +1724,12 @@ public function cancel(Envelope $envelope): void
 }
 ```
 
-- [ ] **Step 5: Rodar e ver passar + suíte**
+- [x] **Step 5: Rodar e ver passar + suíte**
 
 Run: `& $php artisan test --filter=EnvelopeServiceSignTest` → PASS
 Run: `& $php artisan test` → PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add app/Services/Envelope/EnvelopeService.php app/Jobs/SealEnvelopeJob.php tests/Feature/EnvelopeServiceSignTest.php
@@ -1747,7 +1747,7 @@ git commit -m "feat: EnvelopeService - otp, assinatura, recusa e cancelamento"
 **Interfaces:**
 - Produces: `generate(Envelope $envelope): string` — caminho ABSOLUTO de um PDF temporário contendo só a(s) página(s) de evidências. Consumido pelo `EnvelopePdfComposer` (Task 8).
 
-- [ ] **Step 1: Teste que falha**
+- [x] **Step 1: Teste que falha**
 
 ```php
 <?php
@@ -1791,12 +1791,12 @@ class EvidenceReportGeneratorTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `& $php artisan test --filter=EvidenceReportGeneratorTest`
 Expected: FAIL
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 ```php
 <?php
@@ -1918,7 +1918,7 @@ class EvidenceReportGenerator
 }
 ```
 
-- [ ] **Step 4: Rodar e ver passar + suíte, e commitar**
+- [x] **Step 4: Rodar e ver passar + suíte, e commitar**
 
 Run: `& $php artisan test --filter=EvidenceReportGeneratorTest` → PASS
 Run: `& $php artisan test` → PASS
@@ -1941,7 +1941,7 @@ git commit -m "feat: gerador da pagina de evidencias do envelope"
 - Produces: `compose(Envelope $envelope, string $evidencePdfPath): array{path: string, pages: int}` — PDF temporário: original com as assinaturas carimbadas + páginas de evidências ao final; `pages` = total de páginas do resultado (a Task 9 usa para posicionar o selo da plataforma na última página).
 - Coordenadas: `envelope_fields` já está em pontos PDF topo-esquerdo; usando FPDI com unidade `pt`, `Image($file, $x, $y, $w, $h)` aplica direto, sem conversão (diferente do `SignPdfService`, que usa mm + `getScaleFactor`).
 
-- [ ] **Step 1: Teste que falha**
+- [x] **Step 1: Teste que falha**
 
 ```php
 <?php
@@ -2015,12 +2015,12 @@ class EnvelopePdfComposerTest extends TestCase
 
 Nota: confirmar o namespace FPDI usado no projeto em `app/Services/Pdf/SignPdfService.php` (linha ~40, onde `$this->pdf` é instanciado) e usar o MESMO nas classes novas — se lá for `\setasign\Fpdi\Tcpdf\Fpdi`, manter; se for outro wrapper, ajustar aqui e no composer abaixo.
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `& $php artisan test --filter=EnvelopePdfComposerTest`
 Expected: FAIL
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 ```php
 <?php
@@ -2105,7 +2105,7 @@ class EnvelopePdfComposer
 }
 ```
 
-- [ ] **Step 4: Rodar e ver passar + suíte, e commitar**
+- [x] **Step 4: Rodar e ver passar + suíte, e commitar**
 
 Run: `& $php artisan test --filter=EnvelopePdfComposerTest` → PASS
 Run: `& $php artisan test` → PASS
@@ -2128,7 +2128,7 @@ git commit -m "feat: composicao do PDF final do envelope (carimbos + evidencias)
 - Produces: envelope `completed` com `final_pdf_path = signed/envelopes/{id}/final.pdf` e `sha256_final`; eventos `sealed` e `completed`; e-mails a remetente e signatários. Em falha: evento `seal_failed` + exceção relançada (retry da queue).
 - Selo visível da plataforma: última página (evidências), canto inferior direito — `['page' => $pages, 'x' => 400, 'y' => 780, 'w' => 150, 'h' => 40]`.
 
-- [ ] **Step 1: Teste que falha**
+- [x] **Step 1: Teste que falha**
 
 O teste roda o lacre DE VERDADE (PFX gerado pelo trait `GeneratesPfx`, motor TCPDF fallback ou pyHanko se instalado) — mesmo approach do `SignDocumentTest::test_signs_uploaded_pdf_end_to_end`.
 
@@ -2259,12 +2259,12 @@ class SealEnvelopeJobTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `& $php artisan test --filter=SealEnvelopeJobTest`
 Expected: FAIL (handle vazio)
 
-- [ ] **Step 3: Implementar o job**
+- [x] **Step 3: Implementar o job**
 
 ```php
 <?php
@@ -2364,7 +2364,7 @@ class SealEnvelopeJob implements ShouldQueue
 
 Nota: `recordEvent(..., meta: [...])` usa named argument pulando `$ip`/`$userAgent` — a assinatura da Task 5 permite (`?string $ip = null, ?string $userAgent = null, array $meta = []`).
 
-- [ ] **Step 4: Rodar e ver passar + suíte, e commitar**
+- [x] **Step 4: Rodar e ver passar + suíte, e commitar**
 
 Run: `& $php artisan test --filter=SealEnvelopeJobTest` → PASS
 Run: `& $php artisan test` → PASS
@@ -2388,7 +2388,7 @@ git commit -m "feat: SealEnvelopeJob - lacre do envelope com certificado da plat
 - Produces rotas (todas `auth`): `envelopes.index|create|store|show|remind|cancel|download|reseal`. O `store` recebe `pdf` (file) + campos + `signers_json` (JSON string montada pelo wizard — validada após decode).
 - Views referenciadas (`client.envelopes.index|create|show`) são criadas na Task 11 — para os testes desta task passarem, criar as três como **placeholders mínimos** (`@extends`-style igual às views client existentes, conteúdo `<h1>` apenas), substituídos na Task 11.
 
-- [ ] **Step 1: Teste que falha**
+- [x] **Step 1: Teste que falha**
 
 ```php
 <?php
@@ -2516,12 +2516,12 @@ class EnvelopeControllerTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `& $php artisan test --filter=EnvelopeControllerTest`
 Expected: FAIL (rotas/controller inexistentes)
 
-- [ ] **Step 3: Rotas (substituir stubs da Task 4)**
+- [x] **Step 3: Rotas (substituir stubs da Task 4)**
 
 ```php
 // routes/web.php — dentro do grupo Route::middleware('auth'), no lugar do stub envelopes.download:
@@ -2539,7 +2539,7 @@ Expected: FAIL (rotas/controller inexistentes)
 
 (Com `use App\Http\Controllers\Client\EnvelopeController;` no topo. Manter os stubs públicos `/sign/*` — viram controller na Task 12.)
 
-- [ ] **Step 4: Controller**
+- [x] **Step 4: Controller**
 
 ```php
 <?php
@@ -2712,11 +2712,11 @@ class EnvelopeController extends Controller
 }
 ```
 
-- [ ] **Step 5: Views placeholder (substituídas na Task 11)**
+- [x] **Step 5: Views placeholder (substituídas na Task 11)**
 
 Criar `resources/views/client/envelopes/index.blade.php`, `create.blade.php` e `show.blade.php` copiando a ESTRUTURA de abertura/fechamento de uma view client existente (ex.: `client/sign-document/index.blade.php` — mesmo layout/component) com conteúdo mínimo `<h1>Envelopes</h1>` etc.
 
-- [ ] **Step 6: Rodar e ver passar + suíte, e commitar**
+- [x] **Step 6: Rodar e ver passar + suíte, e commitar**
 
 Run: `& $php artisan test --filter=EnvelopeControllerTest` → PASS
 Run: `& $php artisan test` → PASS
@@ -2739,7 +2739,7 @@ git commit -m "feat: controller e rotas do cliente para envelopes"
 - Consumes: rotas da Task 10; padrão visual das views client existentes (`client/sign-document/index.blade.php` é a referência de markup, cores `--color-primary`, PDF.js via CDN cdnjs 3.11.174 — MESMA versão/URL usada lá).
 - Produces: wizard que monta `signers_json` + `pdf` num único POST para `envelopes.store`.
 
-- [ ] **Step 1: Menu**
+- [x] **Step 1: Menu**
 
 Em `client/layout.blade.php`, adicionar após o item sign-document (nas DUAS navegações, desktop ~56 e mobile ~103), seguindo exatamente o markup do item existente:
 
@@ -2751,7 +2751,7 @@ Em `client/layout.blade.php`, adicionar após o item sign-document (nas DUAS nav
 </a>
 ```
 
-- [ ] **Step 2: `index.blade.php`**
+- [x] **Step 2: `index.blade.php`**
 
 Tabela: título, badge de status (draft cinza, sent azul, completed verde, declined/cancelled/expired vermelho/cinza), progresso "X/Y assinaram" (usar `signed_count`/`signers_count` do withCount), data, link "ver". Botão "+ Novo envelope" → `envelopes.create`. Vazio: mensagem "Nenhum envelope ainda". Paginação `{{ $envelopes->links() }}`.
 
@@ -2767,7 +2767,7 @@ $statusColors = ['draft' => 'bg-gray-100 text-gray-700', 'sent' => 'bg-blue-100 
 @endphp
 ```
 
-- [ ] **Step 3: `create.blade.php` — wizard Alpine em 3 passos**
+- [x] **Step 3: `create.blade.php` — wizard Alpine em 3 passos**
 
 Estrutura (um único `<form method="POST" enctype="multipart/form-data">` com `x-data="envelopeWizard()"`):
 
@@ -2903,7 +2903,7 @@ function envelopeWizard() {
 
 O implementador deve extrair o loader `loadPdfJs` do `client/sign-document/index.blade.php:264-272` para um partial compartilhado `resources/views/client/partials/pdfjs-loader.blade.php` e incluir nos dois lugares (evita duplicar a URL do CDN).
 
-- [ ] **Step 4: `show.blade.php`**
+- [x] **Step 4: `show.blade.php`**
 
 Seções: cabeçalho (título, badge de status, datas, hash original truncado com title-tooltip), flash `success`/`error`, cartões por signatário (nome, e-mail, método, status badge, assinado em/IP quando signed, motivo quando declined), trilha de eventos (tabela: data/hora, evento, participante, IP), ações:
 
@@ -2924,7 +2924,7 @@ Seções: cabeçalho (título, badge de status, datas, hash original truncado co
 @endif
 ```
 
-- [ ] **Step 5: Ampliar os testes de render**
+- [x] **Step 5: Ampliar os testes de render**
 
 Adicionar ao `EnvelopeControllerTest`:
 
@@ -2942,7 +2942,7 @@ public function test_index_and_show_render_envelope_data(): void
 }
 ```
 
-- [ ] **Step 6: Rodar e ver passar + suíte, e commitar**
+- [x] **Step 6: Rodar e ver passar + suíte, e commitar**
 
 Run: `& $php artisan test --filter=EnvelopeControllerTest` → PASS
 Run: `& $php artisan test` → PASS
@@ -2971,7 +2971,7 @@ git commit -m "feat: views do cliente para envelopes (lista, wizard, detalhe)"
   - `POST /sign/{token}` → `public.sign.store` (throttle:10,1)
   - `POST /sign/{token}/decline` → `public.sign.decline` (throttle:10,1)
 
-- [ ] **Step 1: Teste que falha**
+- [x] **Step 1: Teste que falha**
 
 ```php
 <?php
@@ -3135,12 +3135,12 @@ class PublicSignFlowTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `& $php artisan test --filter=PublicSignFlowTest`
 Expected: FAIL (stubs devolvem 501)
 
-- [ ] **Step 3: Rotas (substituir stubs)**
+- [x] **Step 3: Rotas (substituir stubs)**
 
 ```php
 // routes/web.php — substituir os stubs /sign/* por:
@@ -3159,7 +3159,7 @@ Route::prefix('sign/{token}')->name('public.sign.')->group(function () {
 
 Ajuste: a rota nomeada `public.sign.show` recebia `$token` direto (`route('public.sign.show', $signer->token)`) — com o prefix group isso continua funcionando (parâmetro `token`).
 
-- [ ] **Step 4: Controller**
+- [x] **Step 4: Controller**
 
 ```php
 <?php
@@ -3300,7 +3300,7 @@ class SignEnvelopeController extends Controller
 
 Nota: `unavailable.blade.php` deve exibir `{{ $reason }}` — os asserts do teste (`'não está mais disponível'`, `'expirou'`, `'já assinou'`) batem com os textos do `match`.
 
-- [ ] **Step 5: Views públicas**
+- [x] **Step 5: Views públicas**
 
 Base visual: `layouts/guest.blade.php` (branding `$settings`). As três páginas são standalone (sem login):
 
@@ -3343,7 +3343,7 @@ function signaturePad(el) {
 </script>
 ```
 
-- [ ] **Step 6: Rodar e ver passar + suíte, e commitar**
+- [x] **Step 6: Rodar e ver passar + suíte, e commitar**
 
 Run: `& $php artisan test --filter=PublicSignFlowTest` → PASS
 Run: `& $php artisan test` → PASS
@@ -3363,7 +3363,7 @@ git commit -m "feat: fluxo publico de assinatura de envelopes por token"
 - Modify: `CLAUDE.md` (documentar o módulo)
 - Test: `tests/Feature/ExpireEnvelopesTest.php`
 
-- [ ] **Step 1: Teste que falha**
+- [x] **Step 1: Teste que falha**
 
 ```php
 <?php
@@ -3395,12 +3395,12 @@ class ExpireEnvelopesTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `& $php artisan test --filter=ExpireEnvelopesTest`
 Expected: FAIL (command não existe)
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 ```php
 <?php
@@ -3445,7 +3445,7 @@ use Illuminate\Support\Facades\Schedule;
 Schedule::command('envelopes:expire')->hourly();
 ```
 
-- [ ] **Step 4: Rodar e ver passar**
+- [x] **Step 4: Rodar e ver passar**
 
 Run: `& $php artisan test --filter=ExpireEnvelopesTest` → PASS
 
@@ -3460,11 +3460,11 @@ Roteiro no browser local (Laragon, `MAIL_MAILER=log` para capturar os links):
 5. Conferir: envelope `completed`, download do PDF final abre com os 2 carimbos + página de evidências + assinatura digital válida (painel de assinaturas do Adobe Reader), trilha visível no `show`
 6. Testar recusa e cancelamento em envelopes novos
 
-- [ ] **Step 6: Atualizar `CLAUDE.md`**
+- [x] **Step 6: Atualizar `CLAUDE.md`**
 
 Adicionar seção "Envelopes (assinatura eletrônica multi-signatário)" com: tabelas, rotas cliente + públicas, serviços (`EnvelopeService`, `EvidenceReportGenerator`, `EnvelopePdfComposer`, `SealEnvelopeJob`), regra do lacre (certificado da plataforma em settings), command `envelopes:expire`, e o aviso de que `envelope_events` é imutável. Referenciar o spec.
 
-- [ ] **Step 7: Suíte completa + commit final**
+- [x] **Step 7: Suíte completa + commit final**
 
 Run: `& $php artisan test`
 Expected: PASS
