@@ -33,12 +33,12 @@ jobs:
             cd /var/www/assinador
             git pull origin main
             composer install --no-dev --optimize-autoloader
-            [ -L public/storage ] || php8.4 artisan storage:link
-            php8.4 artisan migrate --force
-            php8.4 artisan optimize:clear
-            php8.4 artisan config:cache
-            php8.4 artisan route:cache
-            php8.4 artisan view:cache
+            [ -L public/storage ] || php8.3 artisan storage:link
+            php8.3 artisan migrate --force
+            php8.3 artisan optimize:clear
+            php8.3 artisan config:cache
+            php8.3 artisan route:cache
+            php8.3 artisan view:cache
 
       - name: Copy build to VPS
         uses: appleboy/scp-action@v0.1.7
