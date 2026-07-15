@@ -99,21 +99,23 @@
     </div>
 
     <main class="flex-1 p-6">
-        @if(session('success'))
-            <div class="mb-6 flex items-center gap-3 bg-green-900/40 border border-green-700 text-green-300 px-4 py-3 rounded text-sm max-w-3xl">
-                {{ session('success') }}
-            </div>
-        @endif
-        @if(session('warning'))
-            <div class="mb-6 flex items-center gap-3 bg-yellow-900/40 border border-yellow-700 text-yellow-300 px-4 py-3 rounded text-sm max-w-3xl">
-                {{ session('warning') }}
-            </div>
-        @endif
-        @if(session('error'))
-            <div class="mb-6 flex items-center gap-3 bg-red-900/40 border border-red-700 text-red-300 px-4 py-3 rounded text-sm max-w-3xl">
-                {{ session('error') }}
-            </div>
-        @endif
+        <div class="max-w-7xl mx-auto">
+            @if(session('success'))
+                <div class="mb-6 flex items-center gap-3 bg-green-900/40 border border-green-700 text-green-300 px-4 py-3 rounded text-sm">
+                    {{ session('success') }}
+                </div>
+            @endif
+            @if(session('warning'))
+                <div class="mb-6 flex items-center gap-3 bg-yellow-900/40 border border-yellow-700 text-yellow-300 px-4 py-3 rounded text-sm">
+                    {{ session('warning') }}
+                </div>
+            @endif
+            @if(session('error'))
+                <div class="mb-6 flex items-center gap-3 bg-red-900/40 border border-red-700 text-red-300 px-4 py-3 rounded text-sm">
+                    {{ session('error') }}
+                </div>
+            @endif
+        </div>
         @yield('content')
     </main>
 
