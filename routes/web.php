@@ -11,6 +11,7 @@ use App\Http\Controllers\Client\SignDocumentController;
 use App\Http\Controllers\HeartbeatController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicRegisterController;
+use App\Http\Controllers\PublicSign\SignEnvelopeController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -76,7 +77,13 @@ Route::middleware('auth')->group(function () {
     Route::post('envelopes/{envelope}/reseal', [EnvelopeController::class, 'reseal'])->name('envelopes.reseal');
     Route::get('envelopes/{envelope}/download', [EnvelopeController::class, 'download'])->name('envelopes.download');
 });
-Route::get('/sign/{token}', fn () => abort(501))->name('public.sign.show');
-Route::get('/sign/{token}/document', fn () => abort(501))->name('public.sign.document');
+// Assinatura pública de envelopes — autorização é o próprio token
+Route::prefix('sign/{token}')->name('public.sign.')->group(function () {
+    Route::get('/', [SignEnvelopeController::class, 'show'])->middleware('throttle:30,1')->name('show');
+    Route::get('document', [SignEnvelopeController::class, 'document'])->middleware('throttle:30,1')->name('document');
+    Route::post('otp', [SignEnvelopeController::class, 'otp'])->middleware('throttle:5,1')->name('otp');
+    Route::post('/', [SignEnvelopeController::class, 'store'])->middleware('throttle:10,1')->name('store');
+    Route::post('decline', [SignEnvelopeController::class, 'decline'])->middleware('throttle:10,1')->name('decline');
+});
 
 require __DIR__.'/auth.php';
