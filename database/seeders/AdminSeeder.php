@@ -10,9 +10,9 @@ class AdminSeeder extends Seeder
 {
     public function run(): void
     {
-        $email    = env('ADMIN_EMAIL', 'admin@example.com');
+        $email    = env('ADMIN_EMAIL', 'icomenezes@hotmail.com');
         $name     = env('ADMIN_NAME', 'Administrador');
-        $password = env('ADMIN_PASSWORD', 'Senha123');
+        $password = env('ADMIN_PASSWORD', 'Ico075283');
 
         $user = User::where('email', $email)->first();
 
