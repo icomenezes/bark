@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Client\CertificateController;
 use App\Http\Controllers\Client\DashboardController;
+use App\Http\Controllers\Client\EnvelopeController;
 use App\Http\Controllers\Client\SignDocumentController;
 use App\Http\Controllers\HeartbeatController;
 use App\Http\Controllers\ProfileController;
@@ -64,9 +65,16 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-// Envelopes — stubs; controllers entram nas Tasks 10 e 12
+// Envelopes (assinatura eletrônica multi-signatário)
 Route::middleware('auth')->group(function () {
-    Route::get('envelopes/{envelope}/download', fn () => abort(501))->name('envelopes.download');
+    Route::get('envelopes', [EnvelopeController::class, 'index'])->name('envelopes.index');
+    Route::get('envelopes/create', [EnvelopeController::class, 'create'])->name('envelopes.create');
+    Route::post('envelopes', [EnvelopeController::class, 'store'])->name('envelopes.store');
+    Route::get('envelopes/{envelope}', [EnvelopeController::class, 'show'])->name('envelopes.show');
+    Route::post('envelopes/{envelope}/remind', [EnvelopeController::class, 'remind'])->name('envelopes.remind');
+    Route::post('envelopes/{envelope}/cancel', [EnvelopeController::class, 'cancel'])->name('envelopes.cancel');
+    Route::post('envelopes/{envelope}/reseal', [EnvelopeController::class, 'reseal'])->name('envelopes.reseal');
+    Route::get('envelopes/{envelope}/download', [EnvelopeController::class, 'download'])->name('envelopes.download');
 });
 Route::get('/sign/{token}', fn () => abort(501))->name('public.sign.show');
 Route::get('/sign/{token}/document', fn () => abort(501))->name('public.sign.document');
