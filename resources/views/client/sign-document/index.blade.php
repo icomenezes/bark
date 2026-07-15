@@ -97,11 +97,39 @@
                 <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider border-b border-gray-800 pb-2 mb-4">
                     Documento
                 </h2>
-                <label class="block text-sm font-medium text-gray-300 mb-1.5">PDF para assinar (máx. 15 MB):</label>
-                <input type="file" name="pdf" id="pdf-file" accept=".pdf"
-                       class="w-full text-sm text-gray-400 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0
-                              file:bg-gray-700 file:text-white file:text-sm hover:file:bg-gray-600
-                              bg-gray-800 border border-gray-700 rounded-lg">
+
+                <div class="flex gap-2 mb-4" role="tablist">
+                    <button type="button" id="doc-tab-upload" data-doc-mode="upload"
+                            class="doc-tab-btn text-sm font-medium px-3 py-1.5 rounded-lg transition-colors bg-gray-700 text-white">
+                        Enviar PDF
+                    </button>
+                    <button type="button" id="doc-tab-text" data-doc-mode="text"
+                            class="doc-tab-btn text-sm font-medium px-3 py-1.5 rounded-lg transition-colors bg-gray-800 text-gray-400 hover:text-white">
+                        Redigir documento
+                    </button>
+                </div>
+
+                <div id="doc-mode-upload">
+                    <label class="block text-sm font-medium text-gray-300 mb-1.5">PDF para assinar (máx. 15 MB):</label>
+                    <input type="file" name="pdf" id="pdf-file" accept=".pdf"
+                           class="w-full text-sm text-gray-400 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0
+                                  file:bg-gray-700 file:text-white file:text-sm hover:file:bg-gray-600
+                                  bg-gray-800 border border-gray-700 rounded-lg">
+                </div>
+
+                <div id="doc-mode-text" class="hidden">
+                    <label class="block text-sm font-medium text-gray-300 mb-1.5">Digite ou cole o texto do documento:</label>
+                    <textarea name="document_text" id="document-text" rows="10" placeholder="Redija o documento aqui..."
+                              class="w-full text-sm text-gray-200 bg-gray-800 border border-gray-700 rounded-lg p-3
+                                     focus:outline-none focus:border-blue-500"></textarea>
+                    <div class="flex items-center justify-between mt-2">
+                        <span id="doc-preview-status" class="text-xs text-gray-500"></span>
+                        <button type="button" id="doc-preview-btn"
+                                class="bg-gray-700 hover:bg-gray-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+                            Gerar prévia
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <div>
@@ -202,7 +230,7 @@
             </div>
 
             <div class="space-y-2 pt-2 border-t border-gray-800">
-                <button type="submit"
+                <button type="submit" id="submit-upload"
                         class="w-full flex items-center justify-center gap-2 bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
@@ -210,13 +238,13 @@
                     </svg>
                     Assinar PDF enviado
                 </button>
-                <button type="submit" formaction="{{ route('sign-document.generate') }}" formnovalidate
-                        class="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors">
+                <button type="submit" id="submit-text" formaction="{{ route('sign-document.generate') }}" formnovalidate
+                        class="hidden w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
                               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
-                    Gerar documento e assinar
+                    Assinar documento redigido
                 </button>
             </div>
         </div>
@@ -392,6 +420,91 @@
         });
     }
 
+    // ─── Carrega um PDF (bytes em memória) no visualizador comum ───────────────
+
+    function loadPdfBytes(bytes) {
+        loadPdfJs(function () {
+            pdfjsLib.getDocument({ data: bytes }).promise.then(function (pdf) {
+                pdfDoc = pdf;
+                totalPages = pdf.numPages;
+                currentPage = 1;
+                document.getElementById('pdf-wrapper').classList.remove('hidden');
+                var nav = document.getElementById('pdf-nav');
+                nav.classList.remove('hidden');
+                nav.classList.add('flex');
+                renderPage(currentPage);
+            }).catch(function () {
+                document.getElementById('pdf-wrapper').classList.add('hidden');
+            });
+        });
+    }
+
+    // ─── Alternância entre "Enviar PDF" e "Redigir documento" ──────────────────
+
+    function initDocModeTabs() {
+        var tabs = document.querySelectorAll('.doc-tab-btn');
+        if (!tabs.length) return;
+
+        function setMode(mode) {
+            tabs.forEach(function (btn) {
+                var active = btn.dataset.docMode === mode;
+                btn.classList.toggle('bg-gray-700', active);
+                btn.classList.toggle('text-white', active);
+                btn.classList.toggle('bg-gray-800', !active);
+                btn.classList.toggle('text-gray-400', !active);
+            });
+            document.getElementById('doc-mode-upload').classList.toggle('hidden', mode !== 'upload');
+            document.getElementById('doc-mode-text').classList.toggle('hidden', mode !== 'text');
+            document.getElementById('submit-upload').classList.toggle('hidden', mode !== 'upload');
+            document.getElementById('submit-text').classList.toggle('hidden', mode !== 'text');
+        }
+
+        tabs.forEach(function (btn) {
+            btn.addEventListener('click', function () { setMode(btn.dataset.docMode); });
+        });
+    }
+
+    function initTextPreview() {
+        var btn = document.getElementById('doc-preview-btn');
+        if (!btn) return;
+
+        btn.addEventListener('click', function () {
+            var text = document.getElementById('document-text').value.trim();
+            if (!text) {
+                alert('Digite o texto do documento antes de gerar a prévia.');
+                return;
+            }
+
+            var status = document.getElementById('doc-preview-status');
+            status.textContent = 'Gerando prévia...';
+            btn.disabled = true;
+
+            fetch('{{ route('sign-document.preview-text') }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/pdf'
+                },
+                body: JSON.stringify({ document_text: text })
+            })
+            .then(function (res) {
+                if (!res.ok) throw new Error();
+                return res.arrayBuffer();
+            })
+            .then(function (buf) {
+                loadPdfBytes(new Uint8Array(buf));
+                status.textContent = 'Prévia gerada — clique no documento para posicionar a assinatura.';
+            })
+            .catch(function () {
+                status.textContent = 'Falha ao gerar a prévia.';
+            })
+            .finally(function () {
+                btn.disabled = false;
+            });
+        });
+    }
+
     function init() {
         var fileInput = document.getElementById('pdf-file');
         if (!fileInput) return;
@@ -399,6 +512,8 @@
         var marker = document.getElementById('sign-marker');
         initDrag(marker);
         initSignaturePad();
+        initDocModeTabs();
+        initTextPreview();
 
         // Preview direto do arquivo local — sem round-trip ao servidor
         fileInput.addEventListener('change', function () {
@@ -406,20 +521,7 @@
             if (!file) return;
             var reader = new FileReader();
             reader.onload = function () {
-                loadPdfJs(function () {
-                    pdfjsLib.getDocument({ data: new Uint8Array(reader.result) }).promise.then(function (pdf) {
-                        pdfDoc = pdf;
-                        totalPages = pdf.numPages;
-                        currentPage = 1;
-                        document.getElementById('pdf-wrapper').classList.remove('hidden');
-                        var nav = document.getElementById('pdf-nav');
-                        nav.classList.remove('hidden');
-                        nav.classList.add('flex');
-                        renderPage(currentPage);
-                    }).catch(function () {
-                        document.getElementById('pdf-wrapper').classList.add('hidden');
-                    });
-                });
+                loadPdfBytes(new Uint8Array(reader.result));
             };
             reader.readAsArrayBuffer(file);
         });

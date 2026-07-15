@@ -49,6 +49,7 @@ Route::middleware('auth')->group(function () {
     Route::get('sign-document', [SignDocumentController::class, 'index'])->name('sign-document.index');
     Route::post('sign-document/sign', [SignDocumentController::class, 'sign'])->name('sign-document.sign');
     Route::post('sign-document/generate', [SignDocumentController::class, 'generate'])->name('sign-document.generate');
+    Route::post('sign-document/preview-text', [SignDocumentController::class, 'previewText'])->name('sign-document.preview-text');
     Route::get('sign-document/download/{filename}', [SignDocumentController::class, 'download'])->name('sign-document.download');
 });
 

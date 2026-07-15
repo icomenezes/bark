@@ -251,6 +251,12 @@ class SignPdfService
 
     // ─── Saída ───────────────────────────────────────────────────────────────
 
+    /** Bytes do PDF em memória — usado para prévia (sem assinatura, sem gravar em disco). */
+    public function outputString(): string
+    {
+        return $this->pdf->Output('', 'S');
+    }
+
     /** Grava o PDF no caminho absoluto informado e retorna esse caminho. */
     public function save(string $absolutePath, bool $useTsa = false): string
     {

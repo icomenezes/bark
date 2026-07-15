@@ -7,6 +7,7 @@ use App\Models\AccessLog;
 use App\Models\Certificate;
 use App\Services\AccessLogService;
 use App\Services\Pdf\PdfSignerService;
+use App\Services\Pdf\SignPdfService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -50,26 +51,43 @@ class SignDocumentController extends Controller
         }, $request->file('pdf')->getClientOriginalName());
     }
 
-    /** Gera um documento a partir do template genérico e assina. */
+    /** Gera um documento a partir do texto redigido pelo usuário (ou do template padrão) e assina. */
     public function generate(Request $request)
     {
         $request->validate([
             'certificate_id' => ['required', 'integer'],
+            'document_text' => ['nullable', 'string', 'max:20000'],
             ...$this->positionRules(),
         ]);
 
         return $this->handleSigning($request, function (PdfSignerService $signer, array $position) use ($request) {
-            $html = view('pdf.sample-document', ['user' => auth()->user()])->render();
+            $html = $this->documentHtml($request->input('document_text', ''));
 
             return $signer->createAndSign(
-                ['title' => 'DOCUMENTO', 'subtitle' => 'Documento gerado pelo sistema'],
+                $this->documentHeader(),
                 $html,
                 [],
                 $request->boolean('initial_all_pages'),
                 $position,
                 $request->boolean('use_tsa')
             );
-        }, 'Documento gerado pelo sistema');
+        }, 'Documento redigido');
+    }
+
+    /** Gera uma prévia (sem assinar, sem salvar) do documento redigido, para posicionar a assinatura. */
+    public function previewText(Request $request)
+    {
+        $request->validate([
+            'document_text' => ['required', 'string', 'max:20000'],
+        ]);
+
+        $svc = new SignPdfService;
+        $svc->createPdf($this->documentHeader(), $this->documentHtml($request->input('document_text')));
+
+        return response($svc->outputString(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="previa.pdf"',
+        ]);
     }
 
     /** Download da saída assinada — somente arquivos do próprio usuário. */
@@ -178,6 +196,22 @@ class SignDocumentController extends Controller
             'drawn_signature' => ['nullable', 'string', 'required_if:signature_mode,draw'],
             'use_seal' => ['nullable', 'boolean'],
         ];
+    }
+
+    private function documentHeader(): array
+    {
+        return ['title' => 'DOCUMENTO', 'subtitle' => 'Gerado em '.now()->format('d/m/Y H:i')];
+    }
+
+    /** Texto digitado pelo usuário → HTML seguro para o TCPDF (writeHTMLCell); vazio cai no template de demonstração. */
+    private function documentHtml(string $text): string
+    {
+        $text = trim($text);
+        if ($text === '') {
+            return view('pdf.sample-document', ['user' => auth()->user()])->render();
+        }
+
+        return '<p>'.nl2br(e($text)).'</p>';
     }
 
     /** Mesmos clamps do ERP: posição em pontos PDF, origem topo-esquerdo. */
