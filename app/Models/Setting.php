@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Cache;
 
 class Setting extends Model
@@ -11,11 +12,17 @@ class Setting extends Model
         'company_name', 'logo_url', 'favicon_url',
         'primary_color', 'accent_color',
         'support_email', 'support_whatsapp', 'whatsapp_enabled',
+        'platform_certificate_id',
     ];
 
     protected $casts = [
         'whatsapp_enabled' => 'boolean',
     ];
+
+    public function platformCertificate(): BelongsTo
+    {
+        return $this->belongsTo(Certificate::class, 'platform_certificate_id');
+    }
 
     public static function current(): self
     {

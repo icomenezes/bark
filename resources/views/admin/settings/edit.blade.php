@@ -109,6 +109,21 @@
                                 after:transition-all peer-checked:after:translate-x-full"></div>
                 </label>
             </div>
+
+            <div>
+                <label class="block text-sm text-gray-300 mb-1">Certificado da plataforma (lacre de envelopes)</label>
+                <select name="platform_certificate_id"
+                        class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+                    <option value="">— nenhum —</option>
+                    @foreach ($certificates as $cert)
+                        <option value="{{ $cert->id }}" @selected(old('platform_certificate_id', $settings->platform_certificate_id) == $cert->id)>
+                            {{ $cert->description }} ({{ $cert->user->name }}@if($cert->expires_at) — vence {{ $cert->expires_at->format('d/m/Y') }}@endif)
+                        </option>
+                    @endforeach
+                </select>
+                <p class="text-xs text-gray-500 mt-1">Usado para assinar digitalmente os envelopes concluídos.</p>
+                @error('platform_certificate_id') <p class="text-red-400 text-xs mt-1">{{ $message }}</p> @enderror
+            </div>
         </div>
 
         <div class="flex justify-end">

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Certificate;
 use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -12,7 +13,8 @@ class SettingController extends Controller
     public function edit()
     {
         $settings = Setting::current();
-        return view('admin.settings.edit', compact('settings'));
+        $certificates = Certificate::with('user')->orderBy('description')->get();
+        return view('admin.settings.edit', compact('settings', 'certificates'));
     }
 
     public function update(Request $request)
@@ -25,10 +27,11 @@ class SettingController extends Controller
             'support_whatsapp'  => ['nullable', 'string', 'max:20'],
             'logo'              => ['nullable', 'image', 'max:1024', 'mimes:png,jpg,jpeg,svg,webp'],
             'favicon'           => ['nullable', 'image', 'max:256', 'mimes:png,ico,svg'],
+            'platform_certificate_id' => ['nullable', 'integer', 'exists:certificates,id'],
         ]);
 
         $settings = Setting::current();
-        $data     = $request->only(['company_name', 'primary_color', 'accent_color', 'support_email', 'support_whatsapp']);
+        $data     = $request->only(['company_name', 'primary_color', 'accent_color', 'support_email', 'support_whatsapp', 'platform_certificate_id']);
         $data['whatsapp_enabled'] = $request->boolean('whatsapp_enabled');
 
         if ($request->hasFile('logo')) {
