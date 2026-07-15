@@ -68,8 +68,8 @@
                 <label class="block text-sm text-gray-300 mb-1">Arquivo PDF *</label>
                 <input type="file" name="pdf" accept="application/pdf" required @change="loadPdf($event)"
                        class="w-full text-sm text-gray-400 file:mr-3 file:px-3 file:py-1.5 file:rounded file:border-0 file:bg-gray-700 file:text-gray-200">
-                <p class="text-xs text-gray-500 mt-1" x-show="pdfDoc" x-cloak>
-                    PDF carregado: <span x-text="pdfDoc?.numPages"></span> página(s)
+                <p class="text-xs text-gray-500 mt-1" x-show="numPages" x-cloak>
+                    PDF carregado: <span x-text="numPages"></span> página(s)
                 </p>
             </div>
         </div>
@@ -146,10 +146,14 @@
 @push('scripts')
 @include('client.partials.pdfjs-loader')
 <script>
+// Documento PDF.js fora do estado do Alpine: o Proxy reativo quebra os
+// campos privados internos do PDF.js (getPage lança TypeError silencioso)
+let _envelopePdfDoc = null;
+
 function envelopeWizard() {
     return {
         step: 1, signers: [], selected: 0, fields: [], // fields: [{signerIdx, page, xPt, yPt}]
-        pdfDoc: null, scale: 1.3,
+        numPages: 0, scale: 1.3,
         colors: ['#2563eb','#dc2626','#16a34a','#9333ea','#ea580c','#0891b2','#db2777','#65a30d'],
 
         addSigner() { if (this.signers.length < 20) this.signers.push({name:'', email:'', auth_method:'link', whatsapp:''}); },
@@ -167,19 +171,21 @@ function envelopeWizard() {
             reader.onload = () => {
                 window.loadPdfJs(() => {
                     pdfjsLib.getDocument({ data: new Uint8Array(reader.result) }).promise.then(pdf => {
-                        this.pdfDoc = pdf;
-                    });
+                        _envelopePdfDoc = pdf;
+                        this.numPages = pdf.numPages;
+                    }).catch(err => alert('Não foi possível ler o PDF: ' + err.message));
                 });
             };
             reader.readAsArrayBuffer(file);
         },
 
         async renderPages() {
-            if (!this.pdfDoc) return;
+            if (!_envelopePdfDoc) return;
+            try {
             const wrap = this.$refs.pages;
             wrap.innerHTML = '';
-            for (let p = 1; p <= this.pdfDoc.numPages; p++) {
-                const page = await this.pdfDoc.getPage(p);
+            for (let p = 1; p <= this.numPages; p++) {
+                const page = await _envelopePdfDoc.getPage(p);
                 const viewport = page.getViewport({ scale: this.scale });
                 const holder = document.createElement('div');
                 holder.className = 'relative mx-auto mb-4 shadow';
@@ -193,6 +199,9 @@ function envelopeWizard() {
                 await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
             }
             this.redrawMarkers();
+            } catch (err) {
+                alert('Falha ao renderizar o PDF: ' + err.message);
+            }
         },
 
         addField(e, holder, page) {
@@ -240,7 +249,7 @@ function envelopeWizard() {
         },
 
         validStep(n) {
-            if (n === 1) return this.$refs.title.value.trim() !== '' && this.pdfDoc !== null;
+            if (n === 1) return this.$refs.title.value.trim() !== '' && this.numPages > 0;
             if (n === 2) return this.signers.length > 0
                 && this.signers.every(s => s.name.trim() && s.email.trim()
                     && (s.auth_method !== 'whatsapp_otp' || s.whatsapp.trim()));
