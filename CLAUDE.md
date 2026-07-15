@@ -199,6 +199,13 @@ Todos usam `$settings` para cores (`--color-primary`, `--color-accent`), logo e 
 6. Logar eventos relevantes com `AccessLogService`
 7. Notificar via `NotificationService` quando fizer sentido
 
+## Deploy (VPS)
+
+Produção roda em `assinador.trsystem.com.br` (`/var/www/assinador`). **Runbook completo em
+`docs/deploy-vps.md`** — regras críticas: artisan sempre com `sudo -u www-data /usr/bin/php8.3`
+(o `php` padrão é 8.4 SEM GD), `queue:restart` após cada deploy (worker systemd
+`assinador-worker` processa o lacre dos envelopes), e cron do scheduler para `envelopes:expire`.
+
 ## Observações
 
 - Usar sempre o PHP do Laragon, nunca o XAMPP (PHP 7.4)
