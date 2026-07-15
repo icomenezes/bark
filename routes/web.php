@@ -64,4 +64,11 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
+// Envelopes — stubs; controllers entram nas Tasks 10 e 12
+Route::middleware('auth')->group(function () {
+    Route::get('envelopes/{envelope}/download', fn () => abort(501))->name('envelopes.download');
+});
+Route::get('/sign/{token}', fn () => abort(501))->name('public.sign.show');
+Route::get('/sign/{token}/document', fn () => abort(501))->name('public.sign.document');
+
 require __DIR__.'/auth.php';

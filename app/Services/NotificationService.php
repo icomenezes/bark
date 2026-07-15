@@ -11,7 +11,13 @@ class NotificationService
 
     public function sendWhatsApp(User $user, string $message): void
     {
-        if (! $user->whatsapp) return;
+        $this->sendWhatsAppTo($user->whatsapp, $message);
+    }
+
+    /** Envia para número avulso (ex.: signatário de envelope, que não é user). */
+    public function sendWhatsAppTo(?string $number, string $message): void
+    {
+        if (! $number) return;
 
         try {
             $settings = Setting::current();
@@ -20,7 +26,7 @@ class NotificationService
             return;
         }
 
-        $this->whatsapp->send($user->whatsapp, $message);
+        $this->whatsapp->send($number, $message);
     }
 
     public function boasVindas(User $user): void
