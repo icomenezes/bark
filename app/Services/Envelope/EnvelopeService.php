@@ -38,7 +38,7 @@ class EnvelopeService
                 'sha256_original' => hash_file('sha256', $pdf->getRealPath()),
             ]);
 
-            $path = $pdf->storeAs("envelopes/{$envelope->id}", 'original.pdf', 'local');
+            $path = $pdf->storeAs("users/{$user->id}/envelopes/{$envelope->id}", 'original.pdf', 'documents');
             $envelope->update(['original_pdf_path' => $path]);
 
             foreach (array_values($data['signers']) as $i => $s) {
@@ -150,8 +150,8 @@ class EnvelopeService
     public function sign(EnvelopeSigner $signer, array $data, ?string $ip, ?string $userAgent): void
     {
         $temp = SignatureImage::storeDataUrl($data['signature']);
-        $relative = "envelopes/{$signer->envelope_id}/signatures/{$signer->id}.png";
-        Storage::disk('local')->put($relative, file_get_contents($temp));
+        $relative = "users/{$signer->envelope->user_id}/envelopes/{$signer->envelope_id}/signatures/{$signer->id}.png";
+        Storage::disk('documents')->put($relative, file_get_contents($temp));
         @unlink($temp);
 
         $signer->update([

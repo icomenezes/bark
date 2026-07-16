@@ -43,14 +43,14 @@ class EnvelopeServiceCreateTest extends TestCase
 
     public function test_create_stores_pdf_hash_signers_and_fields(): void
     {
-        Storage::fake('local');
+        Storage::fake('documents');
         $user = User::factory()->create(['role' => 'client']);
 
         $envelope = $this->makeEnvelope($user);
 
         $this->assertSame('draft', $envelope->status);
-        $this->assertSame("envelopes/{$envelope->id}/original.pdf", $envelope->original_pdf_path);
-        Storage::disk('local')->assertExists($envelope->original_pdf_path);
+        $this->assertSame("users/{$user->id}/envelopes/{$envelope->id}/original.pdf", $envelope->original_pdf_path);
+        Storage::disk('documents')->assertExists($envelope->original_pdf_path);
         $this->assertSame(hash('sha256', '%PDF-1.4 fake'), $envelope->sha256_original);
         $this->assertCount(2, $envelope->signers);
         $this->assertSame([1, 2], $envelope->signers->pluck('sign_position')->all());
@@ -60,7 +60,7 @@ class EnvelopeServiceCreateTest extends TestCase
 
     public function test_send_requires_platform_certificate(): void
     {
-        Storage::fake('local');
+        Storage::fake('documents');
         $envelope = $this->makeEnvelope(User::factory()->create(['role' => 'client']));
 
         $this->expectException(\RuntimeException::class);
@@ -69,7 +69,7 @@ class EnvelopeServiceCreateTest extends TestCase
 
     public function test_send_parallel_notifies_all_signers(): void
     {
-        Storage::fake('local');
+        Storage::fake('documents');
         Mail::fake();
         $this->configurePlatformCertificate();
         $envelope = $this->makeEnvelope(User::factory()->create(['role' => 'client']));
@@ -83,7 +83,7 @@ class EnvelopeServiceCreateTest extends TestCase
 
     public function test_send_sequential_notifies_only_first(): void
     {
-        Storage::fake('local');
+        Storage::fake('documents');
         Mail::fake();
         $this->configurePlatformCertificate();
         $envelope = $this->makeEnvelope(User::factory()->create(['role' => 'client']), ['signing_order' => 'sequential']);

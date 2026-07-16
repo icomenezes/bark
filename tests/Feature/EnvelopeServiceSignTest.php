@@ -69,7 +69,7 @@ class EnvelopeServiceSignTest extends TestCase
 
     public function test_sign_stores_signature_and_dispatches_seal_when_last(): void
     {
-        Storage::fake('local');
+        Storage::fake('documents');
         Queue::fake();
         Mail::fake();
         $envelope = Envelope::factory()->create(['status' => 'sent']);
@@ -85,7 +85,7 @@ class EnvelopeServiceSignTest extends TestCase
         $this->assertSame('Ana Silva', $a->name);
         $this->assertSame('123.456.789-00', $a->cpf);
         $this->assertSame('10.0.0.1', $a->ip_address);
-        Storage::disk('local')->assertExists($a->signature_image_path);
+        Storage::disk('documents')->assertExists($a->signature_image_path);
 
         $svc->sign($b, $this->signData(), '10.0.0.2', 'UA-Test');
         Queue::assertPushed(SealEnvelopeJob::class, 1);
@@ -93,7 +93,7 @@ class EnvelopeServiceSignTest extends TestCase
 
     public function test_sequential_sign_notifies_next(): void
     {
-        Storage::fake('local');
+        Storage::fake('documents');
         Queue::fake();
         Mail::fake();
         $envelope = Envelope::factory()->create(['status' => 'sent', 'signing_order' => 'sequential']);
