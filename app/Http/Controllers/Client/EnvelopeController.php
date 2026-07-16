@@ -125,9 +125,15 @@ class EnvelopeController extends Controller
     {
         $this->authorizeOwner($envelope);
         abort_unless($envelope->status === 'completed' && $envelope->final_pdf_path, 404);
-        abort_unless(Storage::disk('local')->exists($envelope->final_pdf_path), 404);
 
-        return Storage::disk('local')->download($envelope->final_pdf_path, $envelope->title.' (assinado).pdf');
+        $disk = Storage::disk('documents');
+        abort_unless($disk->exists($envelope->final_pdf_path), 404);
+
+        $url = $disk->temporaryUrl($envelope->final_pdf_path, now()->addMinutes(5), [
+            'ResponseContentDisposition' => 'attachment; filename="'.$envelope->title.' (assinado).pdf"',
+        ]);
+
+        return redirect($url);
     }
 
     // ─── Privados ─────────────────────────────────────────────────────────────

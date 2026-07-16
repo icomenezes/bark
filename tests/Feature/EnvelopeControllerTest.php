@@ -43,6 +43,7 @@ class EnvelopeControllerTest extends TestCase
     public function test_store_creates_and_sends_envelope(): void
     {
         Storage::fake('local');
+        Storage::fake('documents');
         Mail::fake();
         $this->configurePlatformCertificate();
         $user = User::factory()->create(['role' => 'client']);
@@ -58,6 +59,7 @@ class EnvelopeControllerTest extends TestCase
     public function test_store_validates_signers_json(): void
     {
         Storage::fake('local');
+        Storage::fake('documents');
         $this->configurePlatformCertificate();
         $user = User::factory()->create(['role' => 'client']);
 
@@ -91,6 +93,7 @@ class EnvelopeControllerTest extends TestCase
     public function test_cancel_remind_and_download(): void
     {
         Storage::fake('local');
+        Storage::fake('documents');
         Mail::fake();
         $owner = User::factory()->create(['role' => 'client']);
         $envelope = Envelope::factory()->for($owner)->create(['status' => 'sent']);
@@ -101,9 +104,9 @@ class EnvelopeControllerTest extends TestCase
         // download antes de completed → 404
         $this->actingAs($owner)->get("/envelopes/{$envelope->id}/download")->assertNotFound();
 
-        Storage::disk('local')->put("signed/envelopes/{$envelope->id}/final.pdf", '%PDF-1.4 final');
-        $envelope->update(['status' => 'completed', 'final_pdf_path' => "signed/envelopes/{$envelope->id}/final.pdf"]);
-        $this->actingAs($owner)->get("/envelopes/{$envelope->id}/download")->assertOk();
+        Storage::disk('documents')->put("users/{$owner->id}/envelopes/{$envelope->id}/final.pdf", '%PDF-1.4 final');
+        $envelope->update(['status' => 'completed', 'final_pdf_path' => "users/{$owner->id}/envelopes/{$envelope->id}/final.pdf"]);
+        $this->actingAs($owner)->get("/envelopes/{$envelope->id}/download")->assertRedirect();
 
         // cancelar só funciona em sent
         $this->actingAs($owner)->post("/envelopes/{$envelope->id}/cancel")->assertSessionHasErrors();
