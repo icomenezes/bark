@@ -77,5 +77,40 @@
         </form>
     </div>
 
+    {{-- Token de API --}}
+    <div class="bg-gray-900 rounded-lg border border-gray-800 p-6 mt-6">
+        <h2 class="text-white font-semibold mb-2">Token de API</h2>
+        <p class="text-xs text-gray-500 mb-4">Usado para integrações externas (ex.: sistema de ponto de venda) criarem envelopes via API.</p>
+
+        @if (session('api_token'))
+            <div class="bg-yellow-900/30 border border-yellow-800 rounded px-3 py-3 text-sm text-yellow-200 mb-4">
+                <p class="font-medium mb-1">Copie este token agora — ele não será exibido novamente:</p>
+                <code class="block bg-gray-950 border border-gray-800 rounded px-3 py-2 text-xs text-white break-all select-all">{{ session('api_token') }}</code>
+            </div>
+        @endif
+
+        @if ($hasApiToken)
+            <div class="flex items-center justify-between mb-4">
+                <span class="inline-flex items-center gap-1.5 text-xs text-green-400">
+                    <span class="w-1.5 h-1.5 rounded-full bg-green-400"></span> Token ativo
+                </span>
+                <form method="POST" action="{{ route('admin.users.api-token.revoke', $user) }}"
+                      onsubmit="return confirm('Revogar o token de API deste usuário?')">
+                    @csrf @method('DELETE')
+                    <button type="submit" class="text-sm text-red-400 hover:text-red-300 transition-colors">Revogar</button>
+                </form>
+            </div>
+        @endif
+
+        <form method="POST" action="{{ route('admin.users.api-token.generate', $user) }}"
+              @if($hasApiToken) onsubmit="return confirm('Gerar um novo token vai revogar o atual. Continuar?')" @endif>
+            @csrf
+            <button type="submit"
+                    class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-6 py-2.5 rounded-lg transition-colors">
+                {{ $hasApiToken ? 'Gerar novo token' : 'Gerar token de API' }}
+            </button>
+        </form>
+    </div>
+
 </div>
 @endsection

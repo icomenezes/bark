@@ -25,6 +25,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
     // Usuários
     Route::resource('users', UserController::class)->only(['index', 'show', 'create', 'store', 'edit', 'update', 'destroy']);
+    Route::post('users/{user}/api-token', [UserController::class, 'generateApiToken'])->name('users.api-token.generate');
+    Route::delete('users/{user}/api-token', [UserController::class, 'revokeApiToken'])->name('users.api-token.revoke');
 
     // Planos (limites de uso mensal)
     Route::resource('plans', PlanController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);

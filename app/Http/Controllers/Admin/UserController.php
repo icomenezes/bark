@@ -72,8 +72,9 @@ class UserController extends Controller
     public function edit(User $user)
     {
         $plans = Plan::orderBy('name')->get();
+        $hasApiToken = $user->tokens()->exists();
 
-        return view('admin.users.edit', compact('user', 'plans'));
+        return view('admin.users.edit', compact('user', 'plans', 'hasApiToken'));
     }
 
     public function update(Request $request, User $user)
@@ -100,5 +101,23 @@ class UserController extends Controller
     {
         $user->delete();
         return redirect()->route('admin.users.index')->with('success', 'Usuário removido.');
+    }
+
+    public function generateApiToken(User $user)
+    {
+        $user->tokens()->delete();
+        $token = $user->createToken('api')->plainTextToken;
+
+        return redirect()->route('admin.users.edit', $user)
+            ->with('success', 'Token de API gerado com sucesso.')
+            ->with('api_token', $token);
+    }
+
+    public function revokeApiToken(User $user)
+    {
+        $user->tokens()->delete();
+
+        return redirect()->route('admin.users.edit', $user)
+            ->with('success', 'Token de API revogado.');
     }
 }

@@ -73,4 +73,53 @@ class UserCrudTest extends TestCase
             'email' => 'existing@example.com',
         ])->assertSessionHasErrors('email');
     }
+
+    public function test_generate_api_token_creates_token_and_shows_it_once(): void
+    {
+        $client = User::factory()->create(['role' => 'client']);
+
+        $response = $this->actingAs($this->admin())->post("/admin/users/{$client->id}/api-token");
+
+        $response->assertRedirect(route('admin.users.edit', $client));
+        $response->assertSessionHas('api_token');
+        $this->assertSame(1, $client->fresh()->tokens()->count());
+    }
+
+    public function test_generate_api_token_revokes_previous_token(): void
+    {
+        $client = User::factory()->create(['role' => 'client']);
+        $client->createToken('api');
+
+        $this->actingAs($this->admin())->post("/admin/users/{$client->id}/api-token");
+
+        $this->assertSame(1, $client->fresh()->tokens()->count());
+    }
+
+    public function test_revoke_api_token_removes_it(): void
+    {
+        $client = User::factory()->create(['role' => 'client']);
+        $client->createToken('api');
+
+        $response = $this->actingAs($this->admin())->delete("/admin/users/{$client->id}/api-token");
+
+        $response->assertRedirect(route('admin.users.edit', $client));
+        $this->assertSame(0, $client->fresh()->tokens()->count());
+    }
+
+    public function test_client_cannot_generate_api_token(): void
+    {
+        $client = User::factory()->create(['role' => 'client']);
+
+        $this->actingAs($client)->post("/admin/users/{$client->id}/api-token")->assertForbidden();
+    }
+
+    public function test_edit_shows_active_token_indicator(): void
+    {
+        $client = User::factory()->create(['role' => 'client']);
+        $client->createToken('api');
+
+        $this->actingAs($this->admin())->get("/admin/users/{$client->id}/edit")
+            ->assertOk()
+            ->assertSee('Token ativo');
+    }
 }
