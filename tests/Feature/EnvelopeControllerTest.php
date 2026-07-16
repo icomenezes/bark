@@ -46,7 +46,7 @@ class EnvelopeControllerTest extends TestCase
         Storage::fake('documents');
         Mail::fake();
         $this->configurePlatformCertificate();
-        $user = User::factory()->create(['role' => 'client']);
+        $user = User::factory()->withPlan()->create(['role' => 'client']);
 
         $response = $this->actingAs($user)->post('/envelopes', $this->validPayload());
 
@@ -61,7 +61,7 @@ class EnvelopeControllerTest extends TestCase
         Storage::fake('local');
         Storage::fake('documents');
         $this->configurePlatformCertificate();
-        $user = User::factory()->create(['role' => 'client']);
+        $user = User::factory()->withPlan()->create(['role' => 'client']);
 
         // sem signatários
         $this->actingAs($user)->post('/envelopes', array_merge($this->validPayload(), ['signers_json' => '[]']))
@@ -133,5 +133,30 @@ class EnvelopeControllerTest extends TestCase
 
         $this->actingAs($owner)->post("/envelopes/{$envelope->id}/reseal")->assertRedirect();
         Queue::assertPushed(SealEnvelopeJob::class, 1);
+    }
+
+    public function test_store_blocked_without_plan(): void
+    {
+        $this->configurePlatformCertificate();
+        $user = User::factory()->create(['role' => 'client', 'plan_id' => null]);
+
+        $this->actingAs($user)->post('/envelopes', $this->validPayload())
+            ->assertSessionHas('error');
+
+        $this->assertStringContainsString('plano', session('error'));
+        $this->assertSame(0, Envelope::count());
+    }
+
+    public function test_store_blocked_when_monthly_limit_reached(): void
+    {
+        $this->configurePlatformCertificate();
+        $user = User::factory()->create(['role' => 'client']);
+        $user->update(['plan_id' => \App\Models\Plan::factory()->create(['max_envelopes_per_month' => 0])->id]);
+
+        $this->actingAs($user)->post('/envelopes', $this->validPayload())
+            ->assertSessionHas('error');
+
+        $this->assertStringContainsString('limite', session('error'));
+        $this->assertSame(0, Envelope::count());
     }
 }

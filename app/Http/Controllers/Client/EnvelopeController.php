@@ -7,6 +7,7 @@ use App\Jobs\SealEnvelopeJob;
 use App\Models\Envelope;
 use App\Services\AccessLogService;
 use App\Services\Envelope\EnvelopeService;
+use App\Services\UsageLimitService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -17,6 +18,7 @@ class EnvelopeController extends Controller
     public function __construct(
         private EnvelopeService $envelopes,
         private AccessLogService $accessLog,
+        private UsageLimitService $usageLimit,
     ) {}
 
     public function index()
@@ -36,6 +38,11 @@ class EnvelopeController extends Controller
 
     public function store(Request $request)
     {
+        $usage = $this->usageLimit->canCreateEnvelope(auth()->user());
+        if (! $usage['allowed']) {
+            return back()->with('error', $usage['reason'])->withInput();
+        }
+
         $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'message' => ['nullable', 'string', 'max:2000'],
