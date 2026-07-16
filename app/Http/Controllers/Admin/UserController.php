@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Mail\BoasVindas;
+use App\Models\Plan;
 use App\Models\User;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules;
 
 class UserController extends Controller
@@ -27,6 +29,7 @@ class UserController extends Controller
 
     public function show(User $user)
     {
+        $user->load('plan');
         $recentLogs = $user->accessLogs()->limit(20)->get();
 
         return view('admin.users.show', compact('user', 'recentLogs'));
@@ -34,7 +37,9 @@ class UserController extends Controller
 
     public function create()
     {
-        return view('admin.users.create');
+        $plans = Plan::orderBy('name')->get();
+
+        return view('admin.users.create', compact('plans'));
     }
 
     public function store(Request $request)
@@ -45,6 +50,7 @@ class UserController extends Controller
             'password' => ['required', 'confirmed', Rules\Password::min(8)],
             'role'     => ['required', 'in:admin,client'],
             'whatsapp' => ['nullable', 'string', 'max:20'],
+            'plan_id'  => ['nullable', 'integer', 'exists:plans,id'],
         ]);
 
         $user = User::create([
@@ -53,6 +59,7 @@ class UserController extends Controller
             'password' => Hash::make($request->password),
             'role'     => $request->role,
             'whatsapp' => $request->whatsapp ? preg_replace('/\D/', '', $request->whatsapp) : null,
+            'plan_id'  => $request->plan_id ?: null,
         ]);
 
         Mail::to($user->email)->queue(new BoasVindas($user));
@@ -60,6 +67,33 @@ class UserController extends Controller
 
         return redirect()->route('admin.users.show', $user)
             ->with('success', 'Usuário criado com sucesso.');
+    }
+
+    public function edit(User $user)
+    {
+        $plans = Plan::orderBy('name')->get();
+
+        return view('admin.users.edit', compact('user', 'plans'));
+    }
+
+    public function update(Request $request, User $user)
+    {
+        $request->validate([
+            'name'     => ['required', 'string', 'max:255'],
+            'email'    => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
+            'whatsapp' => ['nullable', 'string', 'max:20'],
+            'plan_id'  => ['nullable', 'integer', 'exists:plans,id'],
+        ]);
+
+        $user->update([
+            'name'     => $request->name,
+            'email'    => $request->email,
+            'whatsapp' => $request->whatsapp ? preg_replace('/\D/', '', $request->whatsapp) : null,
+            'plan_id'  => $request->plan_id ?: null,
+        ]);
+
+        return redirect()->route('admin.users.show', $user)
+            ->with('success', 'Usuário atualizado com sucesso.');
     }
 
     public function destroy(User $user)

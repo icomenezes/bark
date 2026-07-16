@@ -48,6 +48,18 @@
                 <dt class="text-gray-500 text-xs">Último acesso</dt>
                 <dd class="text-gray-300">{{ $user->activeSession?->last_seen_at?->diffForHumans() ?? '—' }}</dd>
             </div>
+            @if(!$user->isAdmin())
+            <div class="flex justify-between sm:block">
+                <dt class="text-gray-500 text-xs">Plano</dt>
+                <dd class="text-gray-300">
+                    @if($user->plan)
+                        {{ $user->plan->name }}
+                    @else
+                        <span class="text-red-400">Nenhum (bloqueado)</span>
+                    @endif
+                </dd>
+            </div>
+            @endif
         </dl>
     </div>
 
@@ -72,6 +84,10 @@
     </div>
     @endif
 
-    <a href="{{ route('admin.users.index') }}" class="text-sm text-gray-400 hover:text-white transition-colors">← Voltar aos usuários</a>
+    <div class="flex items-center justify-between">
+        <a href="{{ route('admin.users.index') }}" class="text-sm text-gray-400 hover:text-white transition-colors">← Voltar aos usuários</a>
+        <a href="{{ route('admin.users.edit', $user) }}"
+           class="text-sm text-blue-400 hover:text-blue-300 transition-colors">Editar usuário →</a>
+    </div>
 </div>
 @endsection
