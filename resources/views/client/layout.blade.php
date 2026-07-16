@@ -5,9 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Início') — {{ $settings->company_name ?? config('app.name') }}</title>
-    @if($settings->favicon_url ?? false)
-        <link rel="icon" href="{{ $settings->favicon_url }}">
-    @endif
+    <link rel="icon" href="{{ $settings->favicon_url ?? '/favicon.svg' }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
         :root {
@@ -33,10 +31,7 @@
                 <img src="{{ $settings->logo_url }}" alt="{{ $settings->company_name }}" class="h-7 w-auto object-contain">
             @else
                 <div class="w-7 h-7 rounded flex items-center justify-center" style="background-color: var(--color-primary)">
-                    <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                              d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
-                    </svg>
+                    <x-signature-icon class="w-4 h-4 text-white" />
                 </div>
             @endif
             <span class="font-semibold text-sm text-white">{{ $settings->company_name ?? config('app.name') }}</span>
