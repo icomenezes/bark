@@ -51,6 +51,8 @@ class SealEnvelopeJob implements ShouldQueue
             $composedPath = $composed['path'];
 
             // Selo visível da plataforma na última página (evidências), canto inferior direito
+            // PdfSignerService grava o resultado no disk local (scratch) — usado só como
+            // arquivo de trabalho, o definitivo vai para o disk documents (S3) logo abaixo.
             $relative = PdfSignerService::fromCertificate($certificate)->signExisting(
                 $composedPath,
                 initialAllPages: false,
@@ -58,16 +60,17 @@ class SealEnvelopeJob implements ShouldQueue
                 useTsa: false,
             );
 
-            $disk = Storage::disk('local');
-            $final = "signed/envelopes/{$envelope->id}/final.pdf";
-            if ($disk->exists($final)) {
-                $disk->delete($final);
-            }
-            $disk->move($relative, $final);
+            $localDisk = Storage::disk('local');
+            $documentsDisk = Storage::disk('documents');
+            $final = "users/{$envelope->user_id}/envelopes/{$envelope->id}/final.pdf";
+
+            $finalContent = $localDisk->get($relative);
+            $documentsDisk->put($final, $finalContent);
+            $localDisk->delete($relative);
 
             $envelope->update([
                 'final_pdf_path' => $final,
-                'sha256_final' => hash('sha256', $disk->get($final)),
+                'sha256_final' => hash('sha256', $finalContent),
                 'status' => 'completed',
                 'completed_at' => now(),
             ]);

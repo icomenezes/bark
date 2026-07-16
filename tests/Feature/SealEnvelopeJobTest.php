@@ -57,14 +57,16 @@ class SealEnvelopeJobTest extends TestCase
     private function makeSignedEnvelope(): Envelope
     {
         $envelope = Envelope::factory()->create(['status' => 'sent']);
-        Storage::disk('local')->put("envelopes/{$envelope->id}/original.pdf", file_get_contents($this->makeSourcePdf()));
-        $envelope->update(['original_pdf_path' => "envelopes/{$envelope->id}/original.pdf"]);
+        $originalPath = "users/{$envelope->user_id}/envelopes/{$envelope->id}/original.pdf";
+        Storage::disk('documents')->put($originalPath, file_get_contents($this->makeSourcePdf()));
+        $envelope->update(['original_pdf_path' => $originalPath]);
 
         $signer = EnvelopeSigner::factory()->for($envelope)->create([
             'status' => 'signed', 'signed_at' => now(), 'cpf' => '123.456.789-00',
         ]);
-        Storage::disk('local')->put("envelopes/{$envelope->id}/signatures/{$signer->id}.png", $this->signaturePng());
-        $signer->update(['signature_image_path' => "envelopes/{$envelope->id}/signatures/{$signer->id}.png"]);
+        $signaturePath = "users/{$envelope->user_id}/envelopes/{$envelope->id}/signatures/{$signer->id}.png";
+        Storage::disk('documents')->put($signaturePath, $this->signaturePng());
+        $signer->update(['signature_image_path' => $signaturePath]);
         $signer->fields()->create(['page' => 1, 'x' => 100, 'y' => 600, 'w' => 120, 'h' => 40]);
 
         return $envelope->fresh();
@@ -73,6 +75,7 @@ class SealEnvelopeJobTest extends TestCase
     public function test_seals_envelope_end_to_end(): void
     {
         Storage::fake('local');
+        Storage::fake('documents');
         Mail::fake();
         $this->configureRealPlatformCertificate();
         $envelope = $this->makeSignedEnvelope();
@@ -85,10 +88,10 @@ class SealEnvelopeJobTest extends TestCase
 
         $envelope->refresh();
         $this->assertSame('completed', $envelope->status);
-        $this->assertSame("signed/envelopes/{$envelope->id}/final.pdf", $envelope->final_pdf_path);
-        Storage::disk('local')->assertExists($envelope->final_pdf_path);
+        $this->assertSame("users/{$envelope->user_id}/envelopes/{$envelope->id}/final.pdf", $envelope->final_pdf_path);
+        Storage::disk('documents')->assertExists($envelope->final_pdf_path);
         $this->assertSame(
-            hash('sha256', Storage::disk('local')->get($envelope->final_pdf_path)),
+            hash('sha256', Storage::disk('documents')->get($envelope->final_pdf_path)),
             $envelope->sha256_final
         );
         $this->assertTrue($envelope->events()->where('event', 'sealed')->exists());
@@ -100,6 +103,7 @@ class SealEnvelopeJobTest extends TestCase
     public function test_failure_records_seal_failed_and_keeps_status(): void
     {
         Storage::fake('local');
+        Storage::fake('documents');
         Mail::fake();
         // SEM certificado da plataforma → deve falhar
         $envelope = $this->makeSignedEnvelope();
