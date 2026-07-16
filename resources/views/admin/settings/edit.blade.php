@@ -133,6 +133,40 @@
             </button>
         </div>
     </form>
+
+    {{-- Testar WhatsApp --}}
+    <div class="bg-gray-900 border border-gray-800 rounded-lg p-6 space-y-4 mt-6">
+        <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Testar WhatsApp</h3>
+        <p class="text-xs text-gray-500">Envia uma mensagem de teste via Evolution API para validar a conexão da instância.</p>
+
+        @if (session('whatsappTestError'))
+            <div class="bg-red-900/30 border border-red-800 rounded px-3 py-2 text-sm text-red-300">
+                Falha ao enviar: {{ session('whatsappTestError') }}
+            </div>
+        @endif
+
+        <form method="POST" action="{{ route('admin.settings.whatsapp-test') }}" class="space-y-4">
+            @csrf
+            <div>
+                <label class="block text-sm text-gray-300 mb-1">Número (com DDD)</label>
+                <input type="text" name="phone" value="{{ old('phone') }}" placeholder="11999998888"
+                       class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+                @error('phone') <p class="text-red-400 text-xs mt-1">{{ $message }}</p> @enderror
+            </div>
+            <div>
+                <label class="block text-sm text-gray-300 mb-1">Mensagem</label>
+                <textarea name="message" rows="3" placeholder="Mensagem de teste do sistema"
+                          class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">{{ old('message') }}</textarea>
+                @error('message') <p class="text-red-400 text-xs mt-1">{{ $message }}</p> @enderror
+            </div>
+            <div class="flex justify-end">
+                <button type="submit"
+                        class="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm font-medium transition-colors">
+                    Enviar teste
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 
 @push('scripts')
