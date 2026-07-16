@@ -13,7 +13,7 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
-    protected $fillable = ['name', 'email', 'password', 'role', 'whatsapp'];
+    protected $fillable = ['name', 'email', 'password', 'role', 'whatsapp', 'plan_id'];
 
     protected $hidden = ['password', 'remember_token'];
 
@@ -63,6 +63,13 @@ class User extends Authenticatable
     public function certificates()
     {
         return $this->hasMany(Certificate::class);
+    }
+
+    // ── Plano de uso ─────────────────────────────────────────────────────────
+
+    public function plan()
+    {
+        return $this->belongsTo(Plan::class);
     }
 
     // ── Redefinição de senha ─────────────────────────────────────────────────
