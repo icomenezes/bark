@@ -23,7 +23,7 @@ jobs:
           npm ci
           npm run build
 
-      - name: Deploy via SSH
+      - name: Pull latest code on VPS
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -32,13 +32,6 @@ jobs:
           script: |
             cd /var/www/assinador
             git pull origin main
-            composer install --no-dev --optimize-autoloader
-            [ -L public/storage ] || php8.3 artisan storage:link
-            php8.3 artisan migrate --force
-            php8.3 artisan optimize:clear
-            php8.3 artisan config:cache
-            php8.3 artisan route:cache
-            php8.3 artisan view:cache
 
       - name: Copy build to VPS
         uses: appleboy/scp-action@v0.1.7
@@ -48,3 +41,21 @@ jobs:
           key: ${{ secrets.VPS_KEY }}
           source: "public/build"
           target: "/var/www/assinador"
+
+      - name: Finish deploy on VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_KEY }}
+          script: |
+            cd /var/www/assinador
+            chown -R www-data:www-data public/build
+            sudo -u www-data /usr/bin/php8.3 /usr/local/bin/composer install --no-dev --optimize-autoloader --no-interaction
+            [ -L public/storage ] || sudo -u www-data /usr/bin/php8.3 artisan storage:link
+            sudo -u www-data /usr/bin/php8.3 artisan migrate --force
+            sudo -u www-data /usr/bin/php8.3 artisan optimize:clear
+            sudo -u www-data /usr/bin/php8.3 artisan config:cache
+            sudo -u www-data /usr/bin/php8.3 artisan route:cache
+            sudo -u www-data /usr/bin/php8.3 artisan view:cache
+            systemctl restart assinador-worker
