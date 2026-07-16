@@ -65,7 +65,7 @@ class SignDocumentTest extends TestCase
         Storage::fake('local');
         Storage::fake('documents');
         $owner = User::factory()->create(['role' => 'client']);
-        $other = User::factory()->create(['role' => 'client']);
+        $other = User::factory()->withPlan()->create(['role' => 'client']);
         $certificate = Certificate::factory()->for($owner)->create();
 
         $this->actingAs($other)->post('/sign-document/sign', [
@@ -78,7 +78,7 @@ class SignDocumentTest extends TestCase
     {
         Storage::fake('local');
         Storage::fake('documents');
-        $client = User::factory()->create(['role' => 'client']);
+        $client = User::factory()->withPlan()->create(['role' => 'client']);
         $certificate = $this->createRealCertificate($client);
 
         $response = $this->actingAs($client)->post('/sign-document/sign', [
@@ -109,7 +109,7 @@ class SignDocumentTest extends TestCase
     {
         Storage::fake('local');
         Storage::fake('documents');
-        $client = User::factory()->create(['role' => 'client']);
+        $client = User::factory()->withPlan()->create(['role' => 'client']);
         $certificate = $this->createRealCertificate($client);
 
         $response = $this->actingAs($client)->post('/sign-document/generate', [
@@ -128,7 +128,7 @@ class SignDocumentTest extends TestCase
     {
         Storage::fake('local');
         Storage::fake('documents');
-        $client = User::factory()->create(['role' => 'client']);
+        $client = User::factory()->withPlan()->create(['role' => 'client']);
         $certificate = $this->createRealCertificate($client);
 
         // PNG 1x1 válido — o pad envia data-URL PNG do canvas
@@ -154,7 +154,7 @@ class SignDocumentTest extends TestCase
     {
         Storage::fake('local');
         Storage::fake('documents');
-        $client = User::factory()->create(['role' => 'client']);
+        $client = User::factory()->withPlan()->create(['role' => 'client']);
         $certificate = $this->createRealCertificate($client);
 
         $this->actingAs($client)->post('/sign-document/sign', [
@@ -170,7 +170,7 @@ class SignDocumentTest extends TestCase
     {
         Storage::fake('local');
         Storage::fake('documents');
-        $client = User::factory()->create(['role' => 'client']);
+        $client = User::factory()->withPlan()->create(['role' => 'client']);
         $certificate = $this->createRealCertificate($client, withImages: true);
 
         $response = $this->actingAs($client)->post('/sign-document/sign', [
@@ -191,7 +191,7 @@ class SignDocumentTest extends TestCase
     {
         Storage::fake('local');
         Storage::fake('documents');
-        $client = User::factory()->create(['role' => 'client']);
+        $client = User::factory()->withPlan()->create(['role' => 'client']);
         $certificate = $this->createRealCertificate($client); // sem imagens
 
         $this->actingAs($client)->post('/sign-document/sign', [
@@ -208,7 +208,7 @@ class SignDocumentTest extends TestCase
     {
         Storage::fake('local');
         Storage::fake('documents');
-        $client = User::factory()->create(['role' => 'client']);
+        $client = User::factory()->withPlan()->create(['role' => 'client']);
         $certificate = $this->createRealCertificate($client);
         $certificate->update(['expires_at' => now()->subDay()]);
 
@@ -242,5 +242,38 @@ class SignDocumentTest extends TestCase
         $this->actingAs($other)
             ->get(route('sign-document.download', 'doc_abc123.pdf'))
             ->assertRedirect();
+    }
+
+    public function test_signing_blocked_without_plan(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        $client = User::factory()->create(['role' => 'client', 'plan_id' => null]);
+        $certificate = $this->createRealCertificate($client);
+
+        $this->actingAs($client)->post('/sign-document/sign', [
+            'certificate_id' => $certificate->id,
+            'pdf' => new UploadedFile($this->makeSourcePdf(), 'doc.pdf', 'application/pdf', null, true),
+        ])->assertRedirect(route('sign-document.index'))
+            ->assertSessionHas('error');
+
+        $this->assertStringContainsString('plano', session('error'));
+    }
+
+    public function test_signing_blocked_when_monthly_limit_reached(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        $client = User::factory()->create(['role' => 'client']);
+        $client->update(['plan_id' => \App\Models\Plan::factory()->create(['max_pdfs_per_month' => 0])->id]);
+        $certificate = $this->createRealCertificate($client);
+
+        $this->actingAs($client)->post('/sign-document/sign', [
+            'certificate_id' => $certificate->id,
+            'pdf' => new UploadedFile($this->makeSourcePdf(), 'doc.pdf', 'application/pdf', null, true),
+        ])->assertRedirect(route('sign-document.index'))
+            ->assertSessionHas('error');
+
+        $this->assertStringContainsString('limite', session('error'));
     }
 }

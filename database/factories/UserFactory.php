@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Plan;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
@@ -40,6 +41,17 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
+        ]);
+    }
+
+    /** Atribui um plano com limites folgados — usado em testes que não testam a feature de limite. */
+    public function withPlan(int $maxPdfs = 1000, int $maxEnvelopes = 1000): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'plan_id' => Plan::factory()->create([
+                'max_pdfs_per_month' => $maxPdfs,
+                'max_envelopes_per_month' => $maxEnvelopes,
+            ]),
         ]);
     }
 }

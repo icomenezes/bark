@@ -8,12 +8,13 @@ use App\Models\Certificate;
 use App\Services\AccessLogService;
 use App\Services\Pdf\PdfSignerService;
 use App\Services\Pdf\SignPdfService;
+use App\Services\UsageLimitService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class SignDocumentController extends Controller
 {
-    public function __construct(private AccessLogService $accessLog) {}
+    public function __construct(private AccessLogService $accessLog, private UsageLimitService $usageLimit) {}
 
     public function index()
     {
@@ -112,6 +113,11 @@ class SignDocumentController extends Controller
     {
         $certificate = Certificate::find($request->certificate_id);
         abort_if($certificate === null || $certificate->user_id !== auth()->id(), 403);
+
+        $usage = $this->usageLimit->canSignPdf(auth()->user());
+        if (! $usage['allowed']) {
+            return redirect()->route('sign-document.index')->with('error', $usage['reason']);
+        }
 
         $drawnTemp = null;
 
