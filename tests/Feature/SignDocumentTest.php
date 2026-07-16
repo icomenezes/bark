@@ -63,6 +63,7 @@ class SignDocumentTest extends TestCase
     public function test_cannot_sign_with_another_users_certificate(): void
     {
         Storage::fake('local');
+        Storage::fake('documents');
         $owner = User::factory()->create(['role' => 'client']);
         $other = User::factory()->create(['role' => 'client']);
         $certificate = Certificate::factory()->for($owner)->create();
@@ -76,6 +77,7 @@ class SignDocumentTest extends TestCase
     public function test_signs_uploaded_pdf_end_to_end(): void
     {
         Storage::fake('local');
+        Storage::fake('documents');
         $client = User::factory()->create(['role' => 'client']);
         $certificate = $this->createRealCertificate($client);
 
@@ -94,10 +96,10 @@ class SignDocumentTest extends TestCase
             ->assertSessionMissing('error');
 
         $filename = session('signed_file');
-        $relative = 'signed/'.$client->id.'/'.$filename;
-        Storage::disk('local')->assertExists($relative);
+        $relative = 'users/'.$client->id.'/signed/'.$filename;
+        Storage::disk('documents')->assertExists($relative);
 
-        $content = Storage::disk('local')->get($relative);
+        $content = Storage::disk('documents')->get($relative);
         $this->assertStringContainsString('/ByteRange', $content, 'PDF de saída deve conter assinatura digital');
 
         $this->assertDatabaseHas('access_logs', ['event' => 'document_signed']);
@@ -106,6 +108,7 @@ class SignDocumentTest extends TestCase
     public function test_generates_document_from_template_and_signs(): void
     {
         Storage::fake('local');
+        Storage::fake('documents');
         $client = User::factory()->create(['role' => 'client']);
         $certificate = $this->createRealCertificate($client);
 
@@ -117,13 +120,14 @@ class SignDocumentTest extends TestCase
             ->assertSessionHas('signed_file')
             ->assertSessionMissing('error');
 
-        $relative = 'signed/'.$client->id.'/'.session('signed_file');
-        $this->assertStringContainsString('/ByteRange', Storage::disk('local')->get($relative));
+        $relative = 'users/'.$client->id.'/signed/'.session('signed_file');
+        $this->assertStringContainsString('/ByteRange', Storage::disk('documents')->get($relative));
     }
 
     public function test_signs_with_drawn_signature(): void
     {
         Storage::fake('local');
+        Storage::fake('documents');
         $client = User::factory()->create(['role' => 'client']);
         $certificate = $this->createRealCertificate($client);
 
@@ -142,13 +146,14 @@ class SignDocumentTest extends TestCase
             ->assertSessionMissing('error')
             ->assertSessionMissing('warning'); // assinatura desenhada conta como imagem visual
 
-        $relative = 'signed/'.$client->id.'/'.session('signed_file');
-        $this->assertStringContainsString('/ByteRange', Storage::disk('local')->get($relative));
+        $relative = 'users/'.$client->id.'/signed/'.session('signed_file');
+        $this->assertStringContainsString('/ByteRange', Storage::disk('documents')->get($relative));
     }
 
     public function test_invalid_drawn_signature_is_rejected(): void
     {
         Storage::fake('local');
+        Storage::fake('documents');
         $client = User::factory()->create(['role' => 'client']);
         $certificate = $this->createRealCertificate($client);
 
@@ -164,6 +169,7 @@ class SignDocumentTest extends TestCase
     public function test_signs_with_authentication_seal(): void
     {
         Storage::fake('local');
+        Storage::fake('documents');
         $client = User::factory()->create(['role' => 'client']);
         $certificate = $this->createRealCertificate($client, withImages: true);
 
@@ -177,13 +183,14 @@ class SignDocumentTest extends TestCase
             ->assertSessionHas('signed_file')
             ->assertSessionMissing('error');
 
-        $relative = 'signed/'.$client->id.'/'.session('signed_file');
-        $this->assertStringContainsString('/ByteRange', Storage::disk('local')->get($relative));
+        $relative = 'users/'.$client->id.'/signed/'.session('signed_file');
+        $this->assertStringContainsString('/ByteRange', Storage::disk('documents')->get($relative));
     }
 
     public function test_seal_without_registered_logo_fails_clearly(): void
     {
         Storage::fake('local');
+        Storage::fake('documents');
         $client = User::factory()->create(['role' => 'client']);
         $certificate = $this->createRealCertificate($client); // sem imagens
 
@@ -200,6 +207,7 @@ class SignDocumentTest extends TestCase
     public function test_signing_with_expired_certificate_fails_clearly(): void
     {
         Storage::fake('local');
+        Storage::fake('documents');
         $client = User::factory()->create(['role' => 'client']);
         $certificate = $this->createRealCertificate($client);
         $certificate->update(['expires_at' => now()->subDay()]);
@@ -214,10 +222,11 @@ class SignDocumentTest extends TestCase
     public function test_download_rejects_foreign_and_malformed_filenames(): void
     {
         Storage::fake('local');
+        Storage::fake('documents');
         $client = User::factory()->create(['role' => 'client']);
         $other = User::factory()->create(['role' => 'client']);
 
-        Storage::disk('local')->put('signed/'.$other->id.'/doc_abc123.pdf', '%PDF-fake');
+        Storage::disk('documents')->put('users/'.$other->id.'/signed/doc_abc123.pdf', '%PDF-fake');
 
         // Arquivo de outro usuário não é alcançável (escopo pela pasta do auth user)
         $this->actingAs($client)
@@ -232,6 +241,6 @@ class SignDocumentTest extends TestCase
         // Dono baixa normalmente
         $this->actingAs($other)
             ->get(route('sign-document.download', 'doc_abc123.pdf'))
-            ->assertOk();
+            ->assertRedirect();
     }
 }

@@ -25,7 +25,7 @@ class SignDocumentController extends Controller
             ->limit(50)
             ->get()
             ->filter(fn (AccessLog $log) => ! empty($log->meta['file'])
-                && Storage::disk('local')->exists('signed/'.auth()->id().'/'.$log->meta['file']));
+                && Storage::disk('documents')->exists('users/'.auth()->id().'/signed/'.$log->meta['file']));
 
         return view('client.sign-document.index', compact('certificates', 'signedDocuments'));
     }
@@ -95,10 +95,15 @@ class SignDocumentController extends Controller
     {
         abort_unless(preg_match('/^doc_[a-f0-9]+\.pdf(\.tsr)?$/', $filename), 404);
 
-        $path = 'signed/'.auth()->id().'/'.$filename;
-        abort_unless(Storage::disk('local')->exists($path), 404);
+        $disk = Storage::disk('documents');
+        $path = 'users/'.auth()->id().'/signed/'.$filename;
+        abort_unless($disk->exists($path), 404);
 
-        return Storage::disk('local')->download($path);
+        $url = $disk->temporaryUrl($path, now()->addMinutes(5), [
+            'ResponseContentDisposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+
+        return redirect($url);
     }
 
     // ─── Privados ─────────────────────────────────────────────────────────────
@@ -127,19 +132,22 @@ class SignDocumentController extends Controller
 
             $relative = $operation($signer, $position);
 
+            $targetPath = 'users/'.auth()->id().'/signed/'.basename($relative);
+            $signer->moveToDisk($relative, 'documents', $targetPath);
+
             $this->accessLog->log(auth()->user(), 'document_signed', [
                 'certificate_id' => $certificate->id,
                 'certificate_description' => $certificate->description,
                 'engine' => $signer->engine(),
                 'tsa' => $request->boolean('use_tsa'),
                 'use_seal' => $request->boolean('use_seal'),
-                'file' => basename($relative),
+                'file' => basename($targetPath),
                 'original_name' => $originalName,
             ]);
 
             $response = redirect()->route('sign-document.index')
                 ->with('success', 'PDF assinado com sucesso!')
-                ->with('signed_file', basename($relative));
+                ->with('signed_file', basename($targetPath));
 
             if (! $signer->hasSignatureImage()) {
                 $response->with('warning',

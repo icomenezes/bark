@@ -94,6 +94,22 @@ class PdfSignerService
         return PyHankoSigner::available() ? 'pyhanko' : 'tcpdf';
     }
 
+    /**
+     * Move o resultado (path relativo no disk local, devolvido por signExisting()/
+     * createAndSign()) para o disk de destino definitivo, apagando o scratch local.
+     * Retorna o path relativo no disk de destino.
+     */
+    public function moveToDisk(string $localRelativePath, string $targetDisk, string $targetRelativePath): string
+    {
+        $local = Storage::disk('local');
+        $content = $local->get($localRelativePath);
+
+        Storage::disk($targetDisk)->put($targetRelativePath, $content);
+        $local->delete($localRelativePath);
+
+        return $targetRelativePath;
+    }
+
     // ─── Operações ────────────────────────────────────────────────────────────
 
     /**
