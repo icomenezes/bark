@@ -39,14 +39,14 @@ class EnvelopePdfComposerTest extends TestCase
 
     public function test_composes_stamped_pdf_plus_evidence_pages(): void
     {
-        Storage::fake('local');
+        Storage::fake('documents');
 
         $envelope = Envelope::factory()->create(['status' => 'sent']);
-        Storage::disk('local')->put("envelopes/{$envelope->id}/original.pdf", file_get_contents($this->makeSourcePdf(2)));
+        Storage::disk('documents')->put("envelopes/{$envelope->id}/original.pdf", file_get_contents($this->makeSourcePdf(2)));
         $envelope->update(['original_pdf_path' => "envelopes/{$envelope->id}/original.pdf"]);
 
         $signer = EnvelopeSigner::factory()->for($envelope)->create(['status' => 'signed', 'signed_at' => now()]);
-        Storage::disk('local')->put("envelopes/{$envelope->id}/signatures/{$signer->id}.png", $this->signaturePng());
+        Storage::disk('documents')->put("envelopes/{$envelope->id}/signatures/{$signer->id}.png", $this->signaturePng());
         $signer->update(['signature_image_path' => "envelopes/{$envelope->id}/signatures/{$signer->id}.png"]);
         $signer->fields()->create(['page' => 2, 'x' => 100, 'y' => 600, 'w' => 120, 'h' => 40]);
 
