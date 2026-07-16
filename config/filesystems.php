@@ -60,6 +60,18 @@ return [
             'report' => false,
         ],
 
+        'documents' => [
+            'driver' => 's3',
+            'key' => env('DOCUMENTS_S3_ACCESS_KEY_ID'),
+            'secret' => env('DOCUMENTS_S3_SECRET_ACCESS_KEY'),
+            'region' => env('DOCUMENTS_S3_REGION'),
+            'bucket' => env('DOCUMENTS_S3_BUCKET'),
+            'endpoint' => env('DOCUMENTS_S3_ENDPOINT'),
+            'use_path_style_endpoint' => env('DOCUMENTS_S3_USE_PATH_STYLE_ENDPOINT', true),
+            'throw' => false,
+            'report' => false,
+        ],
+
     ],
 
     /*
