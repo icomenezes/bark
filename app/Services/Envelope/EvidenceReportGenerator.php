@@ -34,15 +34,21 @@ class EvidenceReportGenerator
         $pdf->SetFont('helvetica', '', 9);
         $pdf->writeHTML($this->documentSection($envelope), true, false, true);
 
+        $tempFiles = [];
+        $disk = Storage::disk('documents');
+
         foreach ($envelope->signers as $signer) {
             $pdf->SetFont('helvetica', 'B', 11);
             $pdf->Cell(0, 20, 'Signatário: '.$signer->name, 0, 1);
             $pdf->SetFont('helvetica', '', 9);
             $pdf->writeHTML($this->signerSection($signer), true, false, true);
 
-            if ($signer->signature_image_path && Storage::disk('local')->exists($signer->signature_image_path)) {
-                $pdf->Image(Storage::disk('local')->path($signer->signature_image_path),
-                    x: 40, w: 140, h: 0, type: 'PNG');
+            if ($signer->signature_image_path && $disk->exists($signer->signature_image_path)) {
+                $temp = tempnam(sys_get_temp_dir(), 'sig_').'.png';
+                file_put_contents($temp, $disk->get($signer->signature_image_path));
+                $tempFiles[] = $temp;
+
+                $pdf->Image($temp, x: 40, w: 140, h: 0, type: 'PNG');
                 $pdf->Ln(10);
             }
         }
@@ -54,6 +60,10 @@ class EvidenceReportGenerator
 
         $path = tempnam(sys_get_temp_dir(), 'evidence_').'.pdf';
         $pdf->Output($path, 'F');
+
+        foreach ($tempFiles as $temp) {
+            @unlink($temp);
+        }
 
         return $path;
     }
