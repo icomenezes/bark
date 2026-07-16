@@ -31,6 +31,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     // Configurações (white-label)
     Route::get('settings', [SettingController::class, 'edit'])->name('settings.edit');
     Route::patch('settings', [SettingController::class, 'update'])->name('settings.update');
+    Route::post('settings/whatsapp-test', [SettingController::class, 'testWhatsApp'])->name('settings.whatsapp-test');
 });
 
 // Heartbeat — cliente envia a cada 30s para manter sessão ativa

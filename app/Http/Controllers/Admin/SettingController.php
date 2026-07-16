@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Certificate;
 use App\Models\Setting;
+use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -54,5 +55,21 @@ class SettingController extends Controller
         Setting::clearCache();
 
         return back()->with('success', 'Configurações salvas com sucesso.');
+    }
+
+    public function testWhatsApp(Request $request, WhatsAppService $whatsapp)
+    {
+        $request->validate([
+            'phone' => ['required', 'string', 'max:20'],
+            'message' => ['required', 'string', 'max:1000'],
+        ]);
+
+        $result = $whatsapp->sendWithDetails($request->string('phone'), $request->string('message'));
+
+        if ($result['ok']) {
+            return back()->with('success', 'Mensagem de teste enviada com sucesso.');
+        }
+
+        return back()->with('whatsappTestError', $result['error']);
     }
 }
