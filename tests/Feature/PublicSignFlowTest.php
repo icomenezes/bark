@@ -28,8 +28,9 @@ class PublicSignFlowTest extends TestCase
     private function makeSentEnvelope(array $signerAttrs = []): EnvelopeSigner
     {
         $envelope = Envelope::factory()->create(['status' => 'sent']);
-        Storage::disk('local')->put("envelopes/{$envelope->id}/original.pdf", '%PDF-1.4 fake');
-        $envelope->update(['original_pdf_path' => "envelopes/{$envelope->id}/original.pdf"]);
+        $path = "users/{$envelope->user_id}/envelopes/{$envelope->id}/original.pdf";
+        Storage::disk('documents')->put($path, '%PDF-1.4 fake');
+        $envelope->update(['original_pdf_path' => $path]);
 
         return EnvelopeSigner::factory()->for($envelope)->create(array_merge(['status' => 'notified'], $signerAttrs));
     }
@@ -45,6 +46,7 @@ class PublicSignFlowTest extends TestCase
     public function test_show_marks_viewed_and_renders(): void
     {
         Storage::fake('local');
+        Storage::fake('documents');
         $signer = $this->makeSentEnvelope();
 
         $this->get("/sign/{$signer->token}")
@@ -58,6 +60,7 @@ class PublicSignFlowTest extends TestCase
     public function test_invalid_token_and_unavailable_states(): void
     {
         Storage::fake('local');
+        Storage::fake('documents');
         $this->get('/sign/'.str_repeat('x', 64))->assertNotFound();
 
         $signer = $this->makeSentEnvelope();
@@ -72,6 +75,7 @@ class PublicSignFlowTest extends TestCase
     public function test_link_signer_signs_without_otp(): void
     {
         Storage::fake('local');
+        Storage::fake('documents');
         Queue::fake();
         Mail::fake();
         $signer = $this->makeSentEnvelope(['auth_method' => 'link']);
@@ -88,6 +92,7 @@ class PublicSignFlowTest extends TestCase
     public function test_otp_signer_requires_valid_code(): void
     {
         Storage::fake('local');
+        Storage::fake('documents');
         Queue::fake();
         Mail::fake();
         $signer = $this->makeSentEnvelope(['auth_method' => 'email_otp']);
@@ -117,6 +122,7 @@ class PublicSignFlowTest extends TestCase
     public function test_signed_signer_cannot_sign_again(): void
     {
         Storage::fake('local');
+        Storage::fake('documents');
         Queue::fake();
         Mail::fake();
         $signer = $this->makeSentEnvelope(['auth_method' => 'link']);
@@ -130,6 +136,7 @@ class PublicSignFlowTest extends TestCase
     public function test_decline_needs_reason_and_ends_envelope(): void
     {
         Storage::fake('local');
+        Storage::fake('documents');
         Mail::fake();
         $signer = $this->makeSentEnvelope();
 
@@ -144,15 +151,15 @@ class PublicSignFlowTest extends TestCase
     public function test_document_serves_original_then_final(): void
     {
         Storage::fake('local');
+        Storage::fake('documents');
         $signer = $this->makeSentEnvelope();
 
-        $this->get("/sign/{$signer->token}/document")->assertOk()
-            ->assertHeader('content-type', 'application/pdf');
+        $this->get("/sign/{$signer->token}/document")->assertRedirect();
 
-        Storage::disk('local')->put("signed/envelopes/{$signer->envelope_id}/final.pdf", '%PDF-1.4 final');
-        $signer->envelope->update(['status' => 'completed',
-            'final_pdf_path' => "signed/envelopes/{$signer->envelope_id}/final.pdf"]);
+        $finalPath = "users/{$signer->envelope->user_id}/envelopes/{$signer->envelope_id}/final.pdf";
+        Storage::disk('documents')->put($finalPath, '%PDF-1.4 final');
+        $signer->envelope->update(['status' => 'completed', 'final_pdf_path' => $finalPath]);
 
-        $this->get("/sign/{$signer->token}/document")->assertOk();
+        $this->get("/sign/{$signer->token}/document")->assertRedirect();
     }
 }

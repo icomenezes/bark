@@ -35,12 +35,15 @@ class SignEnvelopeController extends Controller
             ? $envelope->final_pdf_path
             : $envelope->original_pdf_path;
 
-        abort_unless(Storage::disk('local')->exists($path), 404);
+        $disk = Storage::disk('documents');
+        abort_unless($disk->exists($path), 404);
 
-        return response(Storage::disk('local')->get($path), 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="documento.pdf"',
+        $url = $disk->temporaryUrl($path, now()->addMinutes(5), [
+            'ResponseContentType' => 'application/pdf',
+            'ResponseContentDisposition' => 'inline; filename="documento.pdf"',
         ]);
+
+        return redirect($url);
     }
 
     public function otp(string $token)
