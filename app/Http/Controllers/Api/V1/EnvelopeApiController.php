@@ -8,6 +8,7 @@ use App\Services\Envelope\EnvelopeService;
 use App\Services\UsageLimitService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use setasign\Fpdi\Tcpdf\Fpdi;
 
@@ -94,9 +95,23 @@ class EnvelopeApiController extends Controller
             'status' => self::STATUS_MAP[$envelope->status] ?? $envelope->status,
             'created_at' => $envelope->created_at->toIso8601String(),
             'signed_at' => $envelope->completed_at?->toIso8601String(),
-            'download_url' => $envelope->status === 'completed'
-                ? route('envelopes.download', $envelope)
-                : null,
+            'download_url' => $this->downloadUrl($envelope),
+        ]);
+    }
+
+    private function downloadUrl(Envelope $envelope): ?string
+    {
+        if ($envelope->status !== 'completed' || ! $envelope->final_pdf_path) {
+            return null;
+        }
+
+        $disk = Storage::disk('documents');
+        if (! $disk->exists($envelope->final_pdf_path)) {
+            return null;
+        }
+
+        return $disk->temporaryUrl($envelope->final_pdf_path, now()->addMinutes(5), [
+            'ResponseContentDisposition' => 'attachment; filename="'.$envelope->title.' (assinado).pdf"',
         ]);
     }
 

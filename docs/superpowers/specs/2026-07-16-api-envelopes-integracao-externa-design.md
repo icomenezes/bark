@@ -127,10 +127,13 @@ vocabulário mais claro à integração externa):
 | `expired` | `expired` |
 
 - `signed_at`: `null` enquanto não `completed`
-- `download_url`: presente somente quando `status = "signed"`; aponta para a rota
-  de download já existente (`envelopes.download`), que exige sessão web autenticada
-  — **fora de escopo desta API baixar o PDF diretamente** (ver seção abaixo);
-  o valor é só a URL, quem acessa precisa estar logado no sistema web como o dono
+- `download_url`: presente somente quando `status = "signed"` **e** o PDF final
+  existir no disk `documents`; é uma URL assinada temporária do S3
+  (`Storage::disk('documents')->temporaryUrl()`, 5 minutos de validade, mesmo
+  padrão já usado em `EnvelopeController::download()`) — funciona sem sessão web,
+  baixável diretamente pelo sistema de origem (ex.: Delphi). Revisado após uso
+  real: a versão original apontava para a rota web autenticada por sessão
+  (`envelopes.download`), inviável para consumo por API
 
 ### Erros
 
@@ -148,9 +151,6 @@ vocabulário mais claro à integração externa):
 
 - **Webhook de notificação de assinatura** — só polling via GET por enquanto,
   conforme pedido
-- **Download do PDF assinado via API** — o `download_url` devolvido aponta para a
-  rota web existente (exige login), não um endpoint de API que devolve o binário
-  direto; se precisar disso depois, é uma extensão futura separada
 - **Múltiplos signatários via API** — sempre 1 signatário por chamada; para
   múltiplos, o cliente deve usar o formulário web
 - **OTP (e-mail/WhatsApp) como autenticação do signatário via API** — sempre

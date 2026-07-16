@@ -162,6 +162,56 @@ class EnvelopeApiControllerTest extends TestCase
 
     public function test_show_maps_completed_status_to_signed_with_download_url(): void
     {
+        Storage::fake('documents');
+        $user = $this->userWithPlan();
+        $token = $user->createToken('api')->plainTextToken;
+        $finalPath = "users/{$user->id}/envelopes/1/final.pdf";
+        Storage::disk('documents')->put($finalPath, '%PDF-1.4 final');
+        $envelope = Envelope::factory()->for($user)->create([
+            'status' => 'completed',
+            'completed_at' => now(),
+            'final_pdf_path' => $finalPath,
+        ]);
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->getJson("/api/v1/envelopes/{$envelope->id}");
+
+        $response->assertOk();
+        $response->assertJson(['status' => 'signed']);
+        $this->assertNotNull($response->json('signed_at'));
+
+        $downloadUrl = $response->json('download_url');
+        $this->assertNotNull($downloadUrl);
+        $this->assertStringNotContainsString('/envelopes/'.$envelope->id.'/download', $downloadUrl);
+    }
+
+    public function test_download_url_is_not_the_session_authenticated_web_route(): void
+    {
+        Storage::fake('documents');
+        $user = $this->userWithPlan();
+        $token = $user->createToken('api')->plainTextToken;
+        $finalPath = "users/{$user->id}/envelopes/1/final.pdf";
+        Storage::disk('documents')->put($finalPath, '%PDF-1.4 final');
+        $envelope = Envelope::factory()->for($user)->create([
+            'status' => 'completed',
+            'completed_at' => now(),
+            'final_pdf_path' => $finalPath,
+        ]);
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->getJson("/api/v1/envelopes/{$envelope->id}");
+
+        $downloadUrl = $response->json('download_url');
+
+        // A URL é assinada diretamente contra o disk (documents), não a rota web
+        // que exige sessão autenticada — verifica que não é mais a rota antiga.
+        $this->assertStringNotContainsString(route('envelopes.download', $envelope), $downloadUrl);
+        $this->assertNotNull($downloadUrl);
+    }
+
+    public function test_download_url_is_null_when_final_pdf_missing_from_disk(): void
+    {
+        Storage::fake('documents');
         $user = $this->userWithPlan();
         $token = $user->createToken('api')->plainTextToken;
         $envelope = Envelope::factory()->for($user)->create([
@@ -173,10 +223,7 @@ class EnvelopeApiControllerTest extends TestCase
         $response = $this->withHeader('Authorization', "Bearer {$token}")
             ->getJson("/api/v1/envelopes/{$envelope->id}");
 
-        $response->assertOk();
-        $response->assertJson(['status' => 'signed']);
-        $this->assertNotNull($response->json('signed_at'));
-        $this->assertNotNull($response->json('download_url'));
+        $this->assertNull($response->json('download_url'));
     }
 
     public function test_show_returns_404_for_other_users_envelope(): void
