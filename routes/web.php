@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AccessLogController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\PlanController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Client\CertificateController;
@@ -23,7 +24,10 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');
 
     // Usuários
-    Route::resource('users', UserController::class)->only(['index', 'show', 'create', 'store', 'destroy']);
+    Route::resource('users', UserController::class)->only(['index', 'show', 'create', 'store', 'edit', 'update', 'destroy']);
+
+    // Planos (limites de uso mensal)
+    Route::resource('plans', PlanController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
 
     // Logs de acesso
     Route::get('access-logs', [AccessLogController::class, 'index'])->name('access-logs.index');
