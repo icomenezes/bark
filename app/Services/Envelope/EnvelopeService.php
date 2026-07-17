@@ -210,8 +210,7 @@ class EnvelopeService
         foreach ($envelope->signers as $signer) {
             if ($signer->channel === 'whatsapp') {
                 $this->notification->sendWhatsAppTo($signer->whatsapp,
-                    "✅ *Documento assinado* — O documento *{$envelope->title}* foi completado e assinado por todos.\n".
-                    'Acesse para download: '.route('public.sign.download', $signer->token)
+                    "✅ *Documento assinado* — O documento *{$envelope->title}* foi completado e assinado por todos."
                 );
             } else {
                 Mail::to($signer->email)->send(new \App\Mail\Envelopes\EnvelopeCompleted($envelope, $signer));
