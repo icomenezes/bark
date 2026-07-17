@@ -59,13 +59,13 @@ class EnvelopeService
         });
     }
 
-    /** Envia os convites. Exige certificado da plataforma válido configurado. */
+    /** Envia os convites. Exige certificado válido: do próprio dono, senão o da plataforma. */
     public function send(Envelope $envelope): void
     {
-        $cert = Setting::current()->platformCertificate;
+        $cert = $envelope->user->signingCertificate ?? Setting::current()->platformCertificate;
         if ($cert === null || $cert->isExpired()) {
             throw new \RuntimeException(
-                'Nenhum certificado da plataforma válido configurado — peça ao administrador para configurar em Configurações.'
+                'Nenhum certificado válido configurado — cadastre um certificado próprio em Certificados ou peça ao administrador para configurar o certificado da plataforma.'
             );
         }
 

@@ -54,9 +54,21 @@ class SealEnvelopeJobTest extends TestCase
         auth()->logout();
     }
 
-    private function makeSignedEnvelope(): Envelope
+    /** Certificado REAL próprio do dono do envelope (não o da plataforma). */
+    private function configureOwnersOwnCertificate(User $owner): void
     {
-        $envelope = Envelope::factory()->create(['status' => 'sent']);
+        $this->actingAs($owner)->post('/certificates', [
+            'description' => 'Cert próprio',
+            'pfx' => new UploadedFile($this->generatePfx('secret'), 'cert.pfx', 'application/octet-stream', null, true),
+            'password' => 'secret',
+        ]);
+        $owner->update(['signing_certificate_id' => \App\Models\Certificate::latest('id')->first()->id]);
+        auth()->logout();
+    }
+
+    private function makeSignedEnvelope(?User $owner = null): Envelope
+    {
+        $envelope = Envelope::factory()->when($owner, fn ($f) => $f->for($owner))->create(['status' => 'sent']);
         $originalPath = "users/{$envelope->user_id}/envelopes/{$envelope->id}/original.pdf";
         Storage::disk('documents')->put($originalPath, file_get_contents($this->makeSourcePdf()));
         $envelope->update(['original_pdf_path' => $originalPath]);
@@ -123,5 +135,26 @@ class SealEnvelopeJobTest extends TestCase
         $this->assertSame('sent', $envelope->status);
         $this->assertNull($envelope->final_pdf_path);
         $this->assertTrue($envelope->events()->where('event', 'seal_failed')->exists());
+    }
+
+    public function test_seals_using_owners_own_certificate_instead_of_platform(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        Mail::fake();
+        // SEM certificado da plataforma configurado — só o certificado próprio do dono existe
+        $owner = User::factory()->create(['role' => 'client']);
+        $this->configureOwnersOwnCertificate($owner);
+        $envelope = $this->makeSignedEnvelope($owner);
+
+        (new SealEnvelopeJob($envelope))->handle(
+            app(\App\Services\Envelope\EvidenceReportGenerator::class),
+            app(\App\Services\Envelope\EnvelopePdfComposer::class),
+            app(\App\Services\Envelope\EnvelopeService::class),
+        );
+
+        $envelope->refresh();
+        $this->assertSame('completed', $envelope->status);
+        Storage::disk('documents')->assertExists($envelope->final_pdf_path);
     }
 }

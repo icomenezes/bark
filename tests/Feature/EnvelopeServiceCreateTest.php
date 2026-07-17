@@ -110,4 +110,31 @@ class EnvelopeServiceCreateTest extends TestCase
 
         Mail::assertNotSent(EnvelopeInvite::class);
     }
+
+    public function test_send_uses_owners_own_certificate_when_configured(): void
+    {
+        Storage::fake('documents');
+        Mail::fake();
+        $this->configurePlatformCertificate(); // certificado da plataforma existe mas não deve ser exigido
+
+        $user = User::factory()->create(['role' => 'client']);
+        $ownCert = Certificate::factory()->for($user)->create(['expires_at' => now()->addYear()]);
+        $user->update(['signing_certificate_id' => $ownCert->id]);
+
+        $envelope = $this->makeEnvelope($user);
+
+        app(EnvelopeService::class)->send($envelope);
+
+        $this->assertSame('sent', $envelope->fresh()->status);
+    }
+
+    public function test_send_fails_when_owner_has_no_certificate_and_no_platform_certificate(): void
+    {
+        Storage::fake('documents');
+        $user = User::factory()->create(['role' => 'client']); // sem signing_certificate_id, sem cert da plataforma
+        $envelope = $this->makeEnvelope($user);
+
+        $this->expectException(\RuntimeException::class);
+        app(EnvelopeService::class)->send($envelope);
+    }
 }
