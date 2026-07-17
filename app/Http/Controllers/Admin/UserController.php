@@ -51,7 +51,11 @@ class UserController extends Controller
             'role'     => ['required', 'in:admin,client'],
             'whatsapp' => ['nullable', 'string', 'max:20'],
             'plan_id'  => ['nullable', 'integer', 'exists:plans,id'],
+            'whatsapp_envelope_enabled' => ['nullable', 'boolean'],
+            'default_envelope_channel' => ['nullable', 'in:email,whatsapp'],
         ]);
+
+        $whatsappEnabled = $request->boolean('whatsapp_envelope_enabled');
 
         $user = User::create([
             'name'     => $request->name,
@@ -60,6 +64,8 @@ class UserController extends Controller
             'role'     => $request->role,
             'whatsapp' => $request->whatsapp ? preg_replace('/\D/', '', $request->whatsapp) : null,
             'plan_id'  => $request->plan_id ?: null,
+            'whatsapp_envelope_enabled' => $whatsappEnabled,
+            'default_envelope_channel' => $whatsappEnabled ? ($request->input('default_envelope_channel') ?: 'email') : 'email',
         ]);
 
         Mail::to($user->email)->queue(new BoasVindas($user));
@@ -84,13 +90,19 @@ class UserController extends Controller
             'email'    => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'whatsapp' => ['nullable', 'string', 'max:20'],
             'plan_id'  => ['nullable', 'integer', 'exists:plans,id'],
+            'whatsapp_envelope_enabled' => ['nullable', 'boolean'],
+            'default_envelope_channel' => ['nullable', 'in:email,whatsapp'],
         ]);
+
+        $whatsappEnabled = $request->boolean('whatsapp_envelope_enabled');
 
         $user->update([
             'name'     => $request->name,
             'email'    => $request->email,
             'whatsapp' => $request->whatsapp ? preg_replace('/\D/', '', $request->whatsapp) : null,
             'plan_id'  => $request->plan_id ?: null,
+            'whatsapp_envelope_enabled' => $whatsappEnabled,
+            'default_envelope_channel' => $whatsappEnabled ? ($request->input('default_envelope_channel') ?: 'email') : 'email',
         ]);
 
         return redirect()->route('admin.users.show', $user)

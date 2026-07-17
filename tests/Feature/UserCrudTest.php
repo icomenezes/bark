@@ -122,4 +122,54 @@ class UserCrudTest extends TestCase
             ->assertOk()
             ->assertSee('Token ativo');
     }
+
+    public function test_store_sets_envelope_channel_preferences(): void
+    {
+        $response = $this->actingAs($this->admin())->post('/admin/users', [
+            'name' => 'Cliente Novo',
+            'email' => 'novo@example.com',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'role' => 'client',
+            'whatsapp_envelope_enabled' => '1',
+            'default_envelope_channel' => 'whatsapp',
+        ]);
+
+        $response->assertRedirect();
+        $user = User::where('email', 'novo@example.com')->first();
+        $this->assertTrue($user->whatsapp_envelope_enabled);
+        $this->assertSame('whatsapp', $user->default_envelope_channel);
+    }
+
+    public function test_store_forces_email_channel_when_whatsapp_not_enabled(): void
+    {
+        $this->actingAs($this->admin())->post('/admin/users', [
+            'name' => 'Cliente Novo',
+            'email' => 'novo2@example.com',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'role' => 'client',
+            'default_envelope_channel' => 'whatsapp', // deve ser ignorado — checkbox não enviado
+        ]);
+
+        $user = User::where('email', 'novo2@example.com')->first();
+        $this->assertFalse($user->whatsapp_envelope_enabled);
+        $this->assertSame('email', $user->default_envelope_channel);
+    }
+
+    public function test_update_toggles_envelope_channel_preferences(): void
+    {
+        $client = User::factory()->create(['role' => 'client', 'whatsapp_envelope_enabled' => false, 'default_envelope_channel' => 'email']);
+
+        $this->actingAs($this->admin())->patch("/admin/users/{$client->id}", [
+            'name' => $client->name,
+            'email' => $client->email,
+            'whatsapp_envelope_enabled' => '1',
+            'default_envelope_channel' => 'whatsapp',
+        ]);
+
+        $client->refresh();
+        $this->assertTrue($client->whatsapp_envelope_enabled);
+        $this->assertSame('whatsapp', $client->default_envelope_channel);
+    }
 }

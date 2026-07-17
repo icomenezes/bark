@@ -64,6 +64,25 @@
                 @enderror
             </div>
 
+            <div>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="whatsapp_envelope_enabled" value="1"
+                           {{ old('whatsapp_envelope_enabled', $user->whatsapp_envelope_enabled) ? 'checked' : '' }}
+                           class="rounded bg-gray-800 border-gray-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-900">
+                    <span class="text-xs font-medium text-gray-400">Permitir envio de envelope via WhatsApp</span>
+                </label>
+            </div>
+
+            <div>
+                <label for="default_envelope_channel" class="block text-xs font-medium text-gray-400 mb-1.5">Canal padrão de envio de envelope</label>
+                <select id="default_envelope_channel" name="default_envelope_channel"
+                        class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3.5 py-2.5 text-white text-sm
+                               focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors">
+                    <option value="email" @selected(old('default_envelope_channel', $user->default_envelope_channel) === 'email')>E-mail</option>
+                    <option value="whatsapp" @selected(old('default_envelope_channel', $user->default_envelope_channel) === 'whatsapp')>WhatsApp</option>
+                </select>
+            </div>
+
             <div class="flex items-center gap-3 pt-2">
                 <button type="submit"
                         class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-6 py-2.5 rounded-lg transition-colors">
