@@ -14,6 +14,7 @@ class EnvelopeSignerFactory extends Factory
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'auth_method' => 'link',
+            'channel' => 'email',
             'sign_position' => 1,
             'status' => 'pending',
         ];
