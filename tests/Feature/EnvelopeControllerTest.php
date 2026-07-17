@@ -205,4 +205,17 @@ class EnvelopeControllerTest extends TestCase
         $response->assertRedirect(route('envelopes.show', $envelope));
         $this->assertSame('whatsapp', $envelope->signers->first()->channel);
     }
+
+    public function test_show_displays_signer_channel_label(): void
+    {
+        $owner = User::factory()->create(['role' => 'client']);
+        $envelope = Envelope::factory()->for($owner)->create(['status' => 'sent']);
+        EnvelopeSigner::factory()->for($envelope)->create([
+            'name' => 'Ana WhatsApp', 'channel' => 'whatsapp', 'whatsapp' => '11999998888',
+            'auth_method' => 'whatsapp_otp', 'status' => 'notified',
+        ]);
+
+        $this->actingAs($owner)->get("/envelopes/{$envelope->id}")
+            ->assertOk()->assertSee('WhatsApp');
+    }
 }
