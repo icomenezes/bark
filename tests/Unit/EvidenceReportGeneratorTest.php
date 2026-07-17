@@ -39,16 +39,7 @@ class EvidenceReportGeneratorTest extends TestCase
         @unlink($path);
     }
 
-    private function signaturePng(): string
-    {
-        $img = imagecreatetruecolor(120, 40);
-        ob_start();
-        imagepng($img);
-
-        return ob_get_clean();
-    }
-
-    public function test_generates_report_with_signature_image_from_documents_disk(): void
+    public function test_generates_report_without_drawing_signature_image(): void
     {
         Storage::fake('documents');
 
@@ -60,9 +51,11 @@ class EvidenceReportGeneratorTest extends TestCase
         ]);
 
         $path = "users/{$envelope->user_id}/envelopes/{$envelope->id}/signatures/{$signer->id}.png";
-        Storage::disk('documents')->put($path, $this->signaturePng());
+        Storage::disk('documents')->put($path, 'fake-png-content');
         $signer->update(['signature_image_path' => $path]);
 
+        // A imagem da assinatura não deve ser lida pelo relatório de evidências — só o
+        // documento no disk carimbado pelo EnvelopePdfComposer deve exibi-la.
         $result = (new EvidenceReportGenerator)->generate($envelope->fresh(['signers', 'events']));
 
         $this->assertFileExists($result);
