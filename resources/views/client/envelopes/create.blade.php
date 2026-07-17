@@ -90,7 +90,7 @@
                             <option value="email">Canal: E-mail</option>
                             <option value="whatsapp">Canal: WhatsApp</option>
                         </select>
-                        <input type="email" placeholder="E-mail" x-model="signer.email" maxlength="255"
+                        <input type="text" placeholder="E-mail" x-model="signer.email" maxlength="255"
                                x-show="signer.channel === 'email'"
                                class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
                         <input type="text" placeholder="WhatsApp (com DDD)" x-model="signer.whatsapp" maxlength="20"
