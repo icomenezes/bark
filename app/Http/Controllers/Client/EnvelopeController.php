@@ -85,7 +85,8 @@ class EnvelopeController extends Controller
         $this->authorizeOwner($envelope);
         $envelope->load(['signers.fields', 'events.signer']);
 
-        $canReseal = $envelope->status === 'sent' && $envelope->allSigned();
+        $hasSealFailure = $envelope->events()->where('event', 'seal_failed')->exists();
+        $canReseal = ($envelope->status === 'sent' && $envelope->allSigned()) || $hasSealFailure;
 
         return view('client.envelopes.show', compact('envelope', 'canReseal'));
     }
