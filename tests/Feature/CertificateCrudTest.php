@@ -175,4 +175,51 @@ class CertificateCrudTest extends TestCase
         Storage::disk('local')->assertMissing($pfxPath);
         $this->assertDatabaseHas('access_logs', ['event' => 'certificate_deleted']);
     }
+
+    public function test_client_can_mark_certificate_as_signing_default(): void
+    {
+        $client = User::factory()->create(['role' => 'client']);
+        $certA = Certificate::factory()->for($client)->create(['expires_at' => now()->addYear()]);
+        $certB = Certificate::factory()->for($client)->create(['expires_at' => now()->addYear()]);
+
+        $this->actingAs($client)->post(route('certificates.use-as-signing', $certA))
+            ->assertRedirect(route('certificates.index'));
+        $this->assertSame($certA->id, $client->fresh()->signing_certificate_id);
+
+        // marking B unmarks A (only one at a time)
+        $this->actingAs($client)->post(route('certificates.use-as-signing', $certB));
+        $this->assertSame($certB->id, $client->fresh()->signing_certificate_id);
+    }
+
+    public function test_client_cannot_mark_expired_certificate_as_signing_default(): void
+    {
+        $client = User::factory()->create(['role' => 'client']);
+        $expired = Certificate::factory()->for($client)->create(['expires_at' => now()->subDay()]);
+
+        $this->actingAs($client)->post(route('certificates.use-as-signing', $expired))
+            ->assertSessionHasErrors();
+        $this->assertNull($client->fresh()->signing_certificate_id);
+    }
+
+    public function test_client_cannot_mark_another_users_certificate_as_signing_default(): void
+    {
+        $owner = User::factory()->create(['role' => 'client']);
+        $other = User::factory()->create(['role' => 'client']);
+        $certificate = Certificate::factory()->for($owner)->create(['expires_at' => now()->addYear()]);
+
+        $this->actingAs($other)->post(route('certificates.use-as-signing', $certificate))->assertForbidden();
+        $this->assertNull($other->fresh()->signing_certificate_id);
+    }
+
+    public function test_deleting_signing_certificate_clears_users_selection(): void
+    {
+        Storage::fake('local');
+        $client = User::factory()->create(['role' => 'client']);
+        $certificate = Certificate::factory()->for($client)->create(['expires_at' => now()->addYear()]);
+        $client->update(['signing_certificate_id' => $certificate->id]);
+
+        $this->actingAs($client)->delete(route('certificates.destroy', $certificate));
+
+        $this->assertNull($client->fresh()->signing_certificate_id);
+    }
 }

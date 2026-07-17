@@ -53,6 +53,8 @@ Route::middleware('auth')->group(function () {
     Route::get('certificates/{certificate}/image/{type}', [CertificateController::class, 'image'])
         ->whereIn('type', ['sign', 'logo'])
         ->name('certificates.image');
+    Route::post('certificates/{certificate}/use-as-signing', [CertificateController::class, 'useAsSigning'])
+        ->name('certificates.use-as-signing');
 
     // Assinatura de documentos
     Route::get('sign-document', [SignDocumentController::class, 'index'])->name('sign-document.index');

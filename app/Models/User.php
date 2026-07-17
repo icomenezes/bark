@@ -14,7 +14,7 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
 
-    protected $fillable = ['name', 'email', 'password', 'role', 'whatsapp', 'plan_id'];
+    protected $fillable = ['name', 'email', 'password', 'role', 'whatsapp', 'plan_id', 'signing_certificate_id'];
 
     protected $hidden = ['password', 'remember_token'];
 
@@ -64,6 +64,11 @@ class User extends Authenticatable
     public function certificates()
     {
         return $this->hasMany(Certificate::class);
+    }
+
+    public function signingCertificate(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Certificate::class, 'signing_certificate_id');
     }
 
     // ── Plano de uso ─────────────────────────────────────────────────────────
