@@ -10,6 +10,7 @@ return new class extends Migration
     {
         Schema::table('envelope_signers', function (Blueprint $table) {
             $table->enum('channel', ['email', 'whatsapp'])->default('email')->after('cpf');
+            $table->string('email')->nullable()->change();
         });
     }
 
@@ -17,6 +18,7 @@ return new class extends Migration
     {
         Schema::table('envelope_signers', function (Blueprint $table) {
             $table->dropColumn('channel');
+            $table->string('email')->nullable(false)->change();
         });
     }
 };

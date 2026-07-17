@@ -34,7 +34,7 @@ class EnvelopeControllerTest extends TestCase
             'signing_order' => 'parallel',
             'pdf' => UploadedFile::fake()->createWithContent('c.pdf', '%PDF-1.4 fake'),
             'signers_json' => json_encode([
-                ['name' => 'Ana', 'email' => 'ana@x.com', 'auth_method' => 'link',
+                ['name' => 'Ana', 'email' => 'ana@x.com', 'channel' => 'email', 'auth_method' => 'link',
                  'fields' => [['page' => 1, 'x' => 100, 'y' => 200, 'w' => 120, 'h' => 40]]],
             ]),
         ];
@@ -158,5 +158,51 @@ class EnvelopeControllerTest extends TestCase
 
         $this->assertStringContainsString('limite', session('error'));
         $this->assertSame(0, Envelope::count());
+    }
+
+    public function test_store_validates_channel_and_auth_method_combination(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        $this->configurePlatformCertificate();
+        $user = User::factory()->withPlan()->create(['role' => 'client']);
+
+        // whatsapp channel requires whatsapp number
+        $noWhatsapp = json_encode([['name' => 'Ana', 'channel' => 'whatsapp', 'auth_method' => 'whatsapp_otp',
+            'fields' => [['page' => 1, 'x' => 1, 'y' => 1, 'w' => 50, 'h' => 20]]]]);
+        $this->actingAs($user)->post('/envelopes', array_merge($this->validPayload(), ['signers_json' => $noWhatsapp]))
+            ->assertSessionHasErrors('signers_json');
+
+        // email channel with whatsapp_otp is not allowed
+        $crossed = json_encode([['name' => 'Ana', 'email' => 'ana@x.com', 'channel' => 'email', 'auth_method' => 'whatsapp_otp',
+            'fields' => [['page' => 1, 'x' => 1, 'y' => 1, 'w' => 50, 'h' => 20]]]]);
+        $this->actingAs($user)->post('/envelopes', array_merge($this->validPayload(), ['signers_json' => $crossed]))
+            ->assertSessionHasErrors('signers_json');
+
+        // whatsapp channel with email_otp is not allowed
+        $crossed2 = json_encode([['name' => 'Ana', 'whatsapp' => '11999998888', 'channel' => 'whatsapp', 'auth_method' => 'email_otp',
+            'fields' => [['page' => 1, 'x' => 1, 'y' => 1, 'w' => 50, 'h' => 20]]]]);
+        $this->actingAs($user)->post('/envelopes', array_merge($this->validPayload(), ['signers_json' => $crossed2]))
+            ->assertSessionHasErrors('signers_json');
+    }
+
+    public function test_store_accepts_whatsapp_channel_signer(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        Mail::fake();
+        $this->configurePlatformCertificate();
+        $user = User::factory()->withPlan()->create(['role' => 'client']);
+
+        $payload = array_merge($this->validPayload(), ['signers_json' => json_encode([
+            ['name' => 'Ana', 'whatsapp' => '11999998888', 'channel' => 'whatsapp', 'auth_method' => 'whatsapp_otp',
+             'fields' => [['page' => 1, 'x' => 1, 'y' => 1, 'w' => 50, 'h' => 20]]],
+        ])]);
+
+        $response = $this->actingAs($user)->post('/envelopes', $payload);
+
+        $envelope = Envelope::first();
+        $response->assertRedirect(route('envelopes.show', $envelope));
+        $this->assertSame('whatsapp', $envelope->signers->first()->channel);
     }
 }

@@ -26,9 +26,9 @@ class EnvelopeServiceCreateTest extends TestCase
             'message' => 'Assinar até sexta',
             'signing_order' => 'parallel',
             'signers' => [
-                ['name' => 'Ana', 'email' => 'ana@x.com', 'auth_method' => 'link',
+                ['name' => 'Ana', 'email' => 'ana@x.com', 'channel' => 'email', 'auth_method' => 'link',
                  'fields' => [['page' => 1, 'x' => 100, 'y' => 200, 'w' => 120, 'h' => 40]]],
-                ['name' => 'Beto', 'email' => 'beto@x.com', 'auth_method' => 'email_otp',
+                ['name' => 'Beto', 'email' => 'beto@x.com', 'channel' => 'email', 'auth_method' => 'email_otp',
                  'fields' => [['page' => 1, 'x' => 300, 'y' => 200, 'w' => 120, 'h' => 40]]],
             ],
         ], $overrides));
@@ -92,5 +92,22 @@ class EnvelopeServiceCreateTest extends TestCase
 
         Mail::assertSent(EnvelopeInvite::class, 1);
         $this->assertSame(['notified', 'pending'], $envelope->signers()->pluck('status')->all());
+    }
+
+    public function test_send_notifies_whatsapp_channel_signer_via_whatsapp_only(): void
+    {
+        Storage::fake('documents');
+        Mail::fake();
+        $this->configurePlatformCertificate();
+        $envelope = $this->makeEnvelope(User::factory()->create(['role' => 'client']), [
+            'signers' => [
+                ['name' => 'Ana', 'whatsapp' => '11999998888', 'channel' => 'whatsapp', 'auth_method' => 'whatsapp_otp',
+                 'fields' => [['page' => 1, 'x' => 100, 'y' => 200, 'w' => 120, 'h' => 40]]],
+            ],
+        ]);
+
+        app(EnvelopeService::class)->send($envelope);
+
+        Mail::assertNotSent(EnvelopeInvite::class);
     }
 }

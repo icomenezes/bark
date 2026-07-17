@@ -158,8 +158,9 @@ class EnvelopeController extends Controller
         $validator = Validator::make(['signers' => $signers], [
             'signers' => ['required', 'array', 'min:1', 'max:20'],
             'signers.*.name' => ['required', 'string', 'max:255'],
-            'signers.*.email' => ['required', 'email', 'max:255'],
-            'signers.*.whatsapp' => ['nullable', 'string', 'max:20', 'required_if:signers.*.auth_method,whatsapp_otp'],
+            'signers.*.channel' => ['required', 'in:email,whatsapp'],
+            'signers.*.email' => ['nullable', 'email', 'max:255', 'required_if:signers.*.channel,email'],
+            'signers.*.whatsapp' => ['nullable', 'string', 'max:20', 'required_if:signers.*.channel,whatsapp'],
             'signers.*.auth_method' => ['required', 'in:link,email_otp,whatsapp_otp'],
             'signers.*.fields' => ['required', 'array', 'min:1'],
             'signers.*.fields.*.page' => ['required', 'integer', 'min:1'],
@@ -173,6 +174,15 @@ class EnvelopeController extends Controller
             throw ValidationException::withMessages([
                 'signers_json' => 'Signatários inválidos: '.$validator->errors()->first(),
             ]);
+        }
+
+        foreach ($signers as $signer) {
+            $allowed = $signer['channel'] === 'whatsapp' ? ['link', 'whatsapp_otp'] : ['link', 'email_otp'];
+            if (! in_array($signer['auth_method'], $allowed, true)) {
+                throw ValidationException::withMessages([
+                    'signers_json' => 'Signatários inválidos: método de verificação incompatível com o canal escolhido.',
+                ]);
+            }
         }
 
         return $signers;

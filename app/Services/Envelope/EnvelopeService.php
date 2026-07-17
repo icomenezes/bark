@@ -44,8 +44,9 @@ class EnvelopeService
             foreach (array_values($data['signers']) as $i => $s) {
                 $signer = $envelope->signers()->create([
                     'name' => $s['name'],
-                    'email' => $s['email'],
+                    'email' => $s['email'] ?? null,
                     'whatsapp' => $s['whatsapp'] ?? null,
+                    'channel' => $s['channel'] ?? 'email',
                     'auth_method' => $s['auth_method'],
                     'sign_position' => $i + 1,
                 ]);
@@ -80,15 +81,17 @@ class EnvelopeService
         }
     }
 
-    /** Convite (ou lembrete) por e-mail + espelho WhatsApp. */
+    /** Convite (ou lembrete) pelo canal do signatário (e-mail ou WhatsApp). */
     public function notifySigner(EnvelopeSigner $signer, bool $reminder = false): void
     {
-        Mail::to($signer->email)->send(new EnvelopeInvite($signer, $reminder));
-
-        $this->notification->sendWhatsAppTo($signer->whatsapp,
-            "📄 *{$signer->envelope->user->name}* enviou o documento *{$signer->envelope->title}* para você assinar.\n".
-            'Acesse: '.route('public.sign.show', $signer->token)
-        );
+        if ($signer->channel === 'whatsapp') {
+            $this->notification->sendWhatsAppTo($signer->whatsapp,
+                "📄 *{$signer->envelope->user->name}* enviou o documento *{$signer->envelope->title}* para você assinar.\n".
+                'Acesse: '.route('public.sign.show', $signer->token)
+            );
+        } else {
+            Mail::to($signer->email)->send(new EnvelopeInvite($signer, $reminder));
+        }
 
         if ($signer->status === 'pending') {
             $signer->update(['status' => 'notified']);
@@ -117,7 +120,7 @@ class EnvelopeService
             'otp_attempts' => 0,
         ]);
 
-        if ($signer->auth_method === 'whatsapp_otp' && $signer->whatsapp) {
+        if ($signer->channel === 'whatsapp') {
             $this->notification->sendWhatsAppTo($signer->whatsapp,
                 "🔐 Seu código para assinar *{$signer->envelope->title}*: *{$code}*\nVale por 10 minutos.");
         } else {
