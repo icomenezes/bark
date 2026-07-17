@@ -13,9 +13,5 @@
     <div class="bg-gray-900 border border-gray-800 rounded-lg p-6">
         @include('profile.partials.update-password-form')
     </div>
-
-    <div class="bg-gray-900 border border-gray-800 rounded-lg p-6">
-        @include('profile.partials.delete-user-form')
-    </div>
 </div>
 @endsection

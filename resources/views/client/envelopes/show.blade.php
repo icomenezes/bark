@@ -13,6 +13,7 @@ $signerColors = ['pending' => 'bg-gray-100 text-gray-700', 'notified' => 'bg-blu
                  'viewed' => 'bg-yellow-100 text-yellow-700', 'signed' => 'bg-green-100 text-green-700',
                  'declined' => 'bg-red-100 text-red-700'];
 $authLabels = ['link' => 'Somente link', 'email_otp' => 'Código por e-mail', 'whatsapp_otp' => 'Código por WhatsApp'];
+$channelLabels = ['email' => 'E-mail', 'whatsapp' => 'WhatsApp'];
 @endphp
 
 @section('content')
@@ -87,8 +88,8 @@ $authLabels = ['link' => 'Somente link', 'email_otp' => 'Código por e-mail', 'w
                         {{ $signerLabels[$signer->status] ?? $signer->status }}
                     </span>
                 </div>
-                <p class="text-xs text-gray-400">{{ $signer->email }}</p>
-                <p class="text-xs text-gray-500">Autenticação: {{ $authLabels[$signer->auth_method] ?? $signer->auth_method }}</p>
+                <p class="text-xs text-gray-400">{{ $signer->email ?? $signer->whatsapp }}</p>
+                <p class="text-xs text-gray-500">Canal: {{ $channelLabels[$signer->channel] ?? $signer->channel }} · Autenticação: {{ $authLabels[$signer->auth_method] ?? $signer->auth_method }}</p>
                 @if ($signer->status === 'signed')
                     <p class="text-xs text-gray-500">
                         Assinou em {{ $signer->signed_at?->format('d/m/Y H:i:s') }}

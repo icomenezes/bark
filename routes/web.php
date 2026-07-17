@@ -53,6 +53,8 @@ Route::middleware('auth')->group(function () {
     Route::get('certificates/{certificate}/image/{type}', [CertificateController::class, 'image'])
         ->whereIn('type', ['sign', 'logo'])
         ->name('certificates.image');
+    Route::post('certificates/{certificate}/use-as-signing', [CertificateController::class, 'useAsSigning'])
+        ->name('certificates.use-as-signing');
 
     // Assinatura de documentos
     Route::get('sign-document', [SignDocumentController::class, 'index'])->name('sign-document.index');
@@ -70,7 +72,6 @@ Route::post('/api/register', [PublicRegisterController::class, 'store'])
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
 // Envelopes (assinatura eletrônica multi-signatário)

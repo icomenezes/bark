@@ -31,7 +31,7 @@ class SealEnvelopeJob implements ShouldQueue
         EnvelopePdfComposer $composer,
         EnvelopeService $service,
     ): void {
-        $envelope = $this->envelope->fresh(['signers.fields', 'user']);
+        $envelope = $this->envelope->fresh(['signers.fields', 'user.signingCertificate']);
 
         if ($envelope->status !== 'sent' || ! $envelope->allSigned()) {
             return; // já lacrado ou estado inválido — idempotente
@@ -41,9 +41,9 @@ class SealEnvelopeJob implements ShouldQueue
         $composedPath = null;
 
         try {
-            $certificate = Setting::current()->platformCertificate;
+            $certificate = $envelope->user->signingCertificate ?? Setting::current()->platformCertificate;
             if ($certificate === null) {
-                throw new \RuntimeException('Certificado da plataforma não configurado.');
+                throw new \RuntimeException('Nenhum certificado válido configurado para lacrar este envelope.');
             }
 
             $evidencePath = $evidence->generate($envelope);

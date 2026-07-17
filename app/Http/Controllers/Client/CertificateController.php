@@ -116,6 +116,23 @@ class CertificateController extends Controller
         return redirect()->route('certificates.index')->with('success', 'Certificado removido.');
     }
 
+    /** Marca este certificado como o usado para lacrar os próprios envelopes do cliente. */
+    public function useAsSigning(Certificate $certificate)
+    {
+        $this->authorizeOwner($certificate);
+
+        if ($certificate->isExpired()) {
+            throw ValidationException::withMessages([
+                'certificate' => 'Não é possível usar um certificado vencido para assinatura.',
+            ]);
+        }
+
+        auth()->user()->update(['signing_certificate_id' => $certificate->id]);
+
+        return redirect()->route('certificates.index')
+            ->with('success', 'Certificado definido como padrão de assinatura.');
+    }
+
     /** Serve as imagens privadas (logo/assinatura) para preview no form e na lista. */
     public function image(Certificate $certificate, string $type)
     {

@@ -103,7 +103,7 @@
             <div class="border border-gray-800 rounded-lg p-4 space-y-2">
                 <p class="text-sm text-gray-300">
                     Este documento exige verificação por código
-                    ({{ $signer->auth_method === 'whatsapp_otp' ? 'WhatsApp' : 'e-mail' }}).
+                    ({{ $signer->channel === 'whatsapp' ? 'WhatsApp' : 'e-mail' }}).
                 </p>
                 <div class="flex flex-wrap items-center gap-2">
                     <button type="submit" form="otp-form"

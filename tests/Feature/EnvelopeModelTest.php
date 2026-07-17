@@ -78,4 +78,22 @@ class EnvelopeModelTest extends TestCase
         $this->assertSame(['a' => 1], $event->fresh()->meta);
         $this->assertNull($event::UPDATED_AT);
     }
+
+    public function test_signer_defaults_to_email_channel(): void
+    {
+        $signer = EnvelopeSigner::factory()->create();
+
+        $this->assertSame('email', $signer->channel);
+    }
+
+    public function test_signer_channel_can_be_whatsapp(): void
+    {
+        $signer = EnvelopeSigner::factory()->create([
+            'channel' => 'whatsapp',
+            'whatsapp' => '11999998888',
+            'auth_method' => 'whatsapp_otp',
+        ]);
+
+        $this->assertSame('whatsapp', $signer->fresh()->channel);
+    }
 }

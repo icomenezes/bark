@@ -13,7 +13,7 @@ class EnvelopeSigner extends Model
     use HasFactory;
 
     protected $fillable = [
-        'envelope_id', 'name', 'email', 'whatsapp', 'cpf',
+        'envelope_id', 'name', 'email', 'whatsapp', 'cpf', 'channel',
         'auth_method', 'sign_position', 'token', 'status',
         'signature_image_path', 'signature_type',
         'otp_code', 'otp_expires_at', 'otp_attempts',

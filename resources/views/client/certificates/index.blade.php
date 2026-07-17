@@ -26,6 +26,7 @@
                     <th class="text-left px-6 py-4 text-gray-400 font-medium">Referência</th>
                     <th class="text-left px-6 py-4 text-gray-400 font-medium">Certificado expira</th>
                     <th class="text-left px-6 py-4 text-gray-400 font-medium">Imagens</th>
+                    <th class="text-left px-6 py-4 text-gray-400 font-medium">Assinatura</th>
                     <th class="px-6 py-4"></th>
                 </tr>
             </thead>
@@ -68,6 +69,18 @@
                         </div>
                     </td>
                     <td class="px-6 py-4">
+                        @if($certificate->id === auth()->user()->signing_certificate_id)
+                            <span class="px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-900/40 text-blue-400 border border-blue-800">Padrão</span>
+                        @elseif($certificate->isExpired())
+                            <span class="text-xs text-gray-600">—</span>
+                        @else
+                            <form method="POST" action="{{ route('certificates.use-as-signing', $certificate) }}">
+                                @csrf
+                                <button class="text-xs text-blue-400 hover:text-blue-300">Usar como assinatura</button>
+                            </form>
+                        @endif
+                    </td>
+                    <td class="px-6 py-4">
                         <div class="flex items-center gap-2 justify-end">
                             <a href="{{ route('certificates.edit', $certificate) }}"
                                class="text-gray-400 hover:text-white p-1.5 rounded-md hover:bg-gray-700 transition-colors" title="Editar">
@@ -91,7 +104,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="5" class="px-6 py-12 text-center text-gray-500">
+                    <td colspan="6" class="px-6 py-12 text-center text-gray-500">
                         Nenhum certificado cadastrado.
                         <a href="{{ route('certificates.create') }}" class="text-blue-400 hover:underline">Cadastre o primeiro</a>.
                     </td>

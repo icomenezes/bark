@@ -85,17 +85,23 @@
                     <div class="grid md:grid-cols-2 gap-3">
                         <input type="text" placeholder="Nome completo" x-model="signer.name" maxlength="255"
                                class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+                        <select x-model="signer.channel" @change="onChannelChange(signer)"
+                                class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+                            <option value="email">Canal: E-mail</option>
+                            <option value="whatsapp">Canal: WhatsApp</option>
+                        </select>
                         <input type="email" placeholder="E-mail" x-model="signer.email" maxlength="255"
+                               x-show="signer.channel === 'email'"
+                               class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+                        <input type="text" placeholder="WhatsApp (com DDD)" x-model="signer.whatsapp" maxlength="20"
+                               x-show="signer.channel === 'whatsapp'"
                                class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
                         <select x-model="signer.auth_method"
                                 class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
                             <option value="link">Somente link</option>
-                            <option value="email_otp">Código por e-mail</option>
-                            <option value="whatsapp_otp">Código por WhatsApp</option>
+                            <option value="email_otp" x-show="signer.channel === 'email'">Código por e-mail</option>
+                            <option value="whatsapp_otp" x-show="signer.channel === 'whatsapp'">Código por WhatsApp</option>
                         </select>
-                        <input type="text" placeholder="WhatsApp (com DDD)" x-model="signer.whatsapp" maxlength="20"
-                               x-show="signer.auth_method === 'whatsapp_otp'"
-                               class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
                     </div>
                 </div>
             </template>
@@ -128,7 +134,7 @@
             <span x-show="step === 1"></span>
             <button type="button" x-show="step < 3"
                     @click="if (validStep(step)) { if (step === 1 && signers.length === 0) addSigner(); step++; if (step === 3) $nextTick(() => renderPages()); }
-                            else alert(step === 1 ? 'Informe o título e selecione um PDF.' : 'Preencha nome e e-mail de todos os signatários (e WhatsApp quando o método for WhatsApp).')"
+                            else alert(step === 1 ? 'Informe o título e selecione um PDF.' : 'Preencha nome e o contato correspondente ao canal escolhido (e-mail ou WhatsApp) de todos os signatários.')"
                     class="px-4 py-2 rounded text-sm font-medium text-white transition-colors"
                     style="background-color: var(--color-primary);">
                 Avançar →
@@ -145,6 +151,7 @@
 
 @push('scripts')
 @include('client.partials.pdfjs-loader')
+<script>window.__envelopeDefaultChannel = '{{ $defaultChannel }}';</script>
 <script>
 // Documento PDF.js fora do estado do Alpine: o Proxy reativo quebra os
 // campos privados internos do PDF.js (getPage lança TypeError silencioso)
@@ -153,15 +160,19 @@ let _envelopePdfDoc = null;
 function envelopeWizard() {
     return {
         step: 1, signers: [], selected: 0, fields: [], // fields: [{signerIdx, page, xPt, yPt}]
-        numPages: 0, scale: 1.3,
+        numPages: 0, scale: 1.3, defaultChannel: window.__envelopeDefaultChannel || 'email',
         colors: ['#2563eb','#dc2626','#16a34a','#9333ea','#ea580c','#0891b2','#db2777','#65a30d'],
 
-        addSigner() { if (this.signers.length < 20) this.signers.push({name:'', email:'', auth_method:'link', whatsapp:''}); },
+        addSigner() { if (this.signers.length < 20) this.signers.push({name:'', email:'', channel: this.defaultChannel, auth_method:'link', whatsapp:''}); },
         removeSigner(i) {
             this.signers.splice(i, 1);
             this.fields = this.fields.filter(f => f.signerIdx !== i)
                 .map(f => f.signerIdx > i ? {...f, signerIdx: f.signerIdx - 1} : f);
             if (this.selected >= this.signers.length) this.selected = 0;
+        },
+        onChannelChange(signer) {
+            const allowed = signer.channel === 'whatsapp' ? ['link', 'whatsapp_otp'] : ['link', 'email_otp'];
+            if (!allowed.includes(signer.auth_method)) signer.auth_method = 'link';
         },
 
         loadPdf(event) {
@@ -251,8 +262,8 @@ function envelopeWizard() {
         validStep(n) {
             if (n === 1) return this.$refs.title.value.trim() !== '' && this.numPages > 0;
             if (n === 2) return this.signers.length > 0
-                && this.signers.every(s => s.name.trim() && s.email.trim()
-                    && (s.auth_method !== 'whatsapp_otp' || s.whatsapp.trim()));
+                && this.signers.every(s => s.name.trim()
+                    && (s.channel === 'email' ? s.email.trim() : s.whatsapp.trim()));
             return true;
         },
 
