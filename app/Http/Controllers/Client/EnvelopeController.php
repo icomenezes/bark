@@ -129,6 +129,14 @@ class EnvelopeController extends Controller
         $hasSealFailure = $envelope->events()->where('event', 'seal_failed')->exists();
         abort_unless(($envelope->status === 'sent' && $envelope->allSigned()) || $hasSealFailure, 400);
 
+        // Se já lacrado, apenas renotificar; senão, fazer lacre completo
+        if ($envelope->final_pdf_path) {
+            $envelope->load('signers');
+            $this->envelopes->notifyCompletion($envelope);
+
+            return back()->with('success', 'Notificações de conclusão reenviadas.');
+        }
+
         SealEnvelopeJob::dispatch($envelope);
 
         return back()->with('success', 'Reprocessamento do lacre iniciado.');
