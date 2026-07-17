@@ -218,4 +218,24 @@ class EnvelopeControllerTest extends TestCase
         $this->actingAs($owner)->get("/envelopes/{$envelope->id}")
             ->assertOk()->assertSee('WhatsApp');
     }
+
+    public function test_create_exposes_clients_default_channel_to_the_wizard(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'client', 'whatsapp_envelope_enabled' => true, 'default_envelope_channel' => 'whatsapp',
+        ]);
+
+        $this->actingAs($user)->get('/envelopes/create')
+            ->assertOk()->assertSee("__envelopeDefaultChannel = 'whatsapp'", false);
+    }
+
+    public function test_create_defaults_to_email_when_whatsapp_not_enabled_for_client(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'client', 'whatsapp_envelope_enabled' => false, 'default_envelope_channel' => 'whatsapp',
+        ]);
+
+        $this->actingAs($user)->get('/envelopes/create')
+            ->assertOk()->assertSee("__envelopeDefaultChannel = 'email'", false);
+    }
 }

@@ -33,7 +33,10 @@ class EnvelopeController extends Controller
 
     public function create()
     {
-        return view('client.envelopes.create');
+        $user = auth()->user();
+        $defaultChannel = $user->whatsapp_envelope_enabled ? $user->default_envelope_channel : 'email';
+
+        return view('client.envelopes.create', compact('defaultChannel'));
     }
 
     public function store(Request $request)

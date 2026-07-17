@@ -151,6 +151,7 @@
 
 @push('scripts')
 @include('client.partials.pdfjs-loader')
+<script>window.__envelopeDefaultChannel = '{{ $defaultChannel }}';</script>
 <script>
 // Documento PDF.js fora do estado do Alpine: o Proxy reativo quebra os
 // campos privados internos do PDF.js (getPage lança TypeError silencioso)
