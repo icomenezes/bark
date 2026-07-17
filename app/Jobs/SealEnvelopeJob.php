@@ -8,6 +8,7 @@ use App\Models\Setting;
 use App\Services\Envelope\EnvelopePdfComposer;
 use App\Services\Envelope\EnvelopeService;
 use App\Services\Envelope\EvidenceReportGenerator;
+use App\Services\NotificationService;
 use App\Services\Pdf\PdfSignerService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -30,6 +31,7 @@ class SealEnvelopeJob implements ShouldQueue
         EvidenceReportGenerator $evidence,
         EnvelopePdfComposer $composer,
         EnvelopeService $service,
+        NotificationService $notification,
     ): void {
         $envelope = $this->envelope->fresh(['signers.fields', 'user.signingCertificate']);
 
@@ -80,7 +82,14 @@ class SealEnvelopeJob implements ShouldQueue
 
             Mail::to($envelope->user->email)->send(new EnvelopeCompleted($envelope));
             foreach ($envelope->signers as $signer) {
-                Mail::to($signer->email)->send(new EnvelopeCompleted($envelope, $signer));
+                if ($signer->channel === 'whatsapp') {
+                    $notification->sendWhatsAppTo($signer->whatsapp,
+                        "✅ *Documento assinado* — O documento *{$envelope->title}* foi completado e assinado por todos.\n".
+                        'Acesse para download: '.route('public.sign.download', $signer->token)
+                    );
+                } else {
+                    Mail::to($signer->email)->send(new EnvelopeCompleted($envelope, $signer));
+                }
             }
         } catch (\Throwable $e) {
             report($e);

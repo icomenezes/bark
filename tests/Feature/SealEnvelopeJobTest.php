@@ -8,6 +8,7 @@ use App\Models\Envelope;
 use App\Models\EnvelopeSigner;
 use App\Models\Setting;
 use App\Models\User;
+use App\Services\NotificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Mail;
@@ -96,6 +97,7 @@ class SealEnvelopeJobTest extends TestCase
             app(\App\Services\Envelope\EvidenceReportGenerator::class),
             app(\App\Services\Envelope\EnvelopePdfComposer::class),
             app(\App\Services\Envelope\EnvelopeService::class),
+            app(NotificationService::class),
         );
 
         $envelope->refresh();
@@ -125,6 +127,7 @@ class SealEnvelopeJobTest extends TestCase
                 app(\App\Services\Envelope\EvidenceReportGenerator::class),
                 app(\App\Services\Envelope\EnvelopePdfComposer::class),
                 app(\App\Services\Envelope\EnvelopeService::class),
+                app(NotificationService::class),
             );
             $this->fail('Deveria ter lançado exceção');
         } catch (\Throwable) {
@@ -151,6 +154,7 @@ class SealEnvelopeJobTest extends TestCase
             app(\App\Services\Envelope\EvidenceReportGenerator::class),
             app(\App\Services\Envelope\EnvelopePdfComposer::class),
             app(\App\Services\Envelope\EnvelopeService::class),
+            app(NotificationService::class),
         );
 
         $envelope->refresh();
