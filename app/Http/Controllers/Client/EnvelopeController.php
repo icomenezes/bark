@@ -125,7 +125,9 @@ class EnvelopeController extends Controller
     public function reseal(Envelope $envelope)
     {
         $this->authorizeOwner($envelope);
-        abort_unless($envelope->status === 'sent' && $envelope->allSigned(), 400);
+
+        $hasSealFailure = $envelope->events()->where('event', 'seal_failed')->exists();
+        abort_unless(($envelope->status === 'sent' && $envelope->allSigned()) || $hasSealFailure, 400);
 
         SealEnvelopeJob::dispatch($envelope);
 
