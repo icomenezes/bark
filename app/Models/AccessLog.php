@@ -46,4 +46,5 @@ class AccessLog extends Model
             default         => 'blue',
         };
     }
+    
 }
