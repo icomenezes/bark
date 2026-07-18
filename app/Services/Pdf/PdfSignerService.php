@@ -104,7 +104,7 @@ class PdfSignerService
         $local = Storage::disk('local');
         $stream = $local->readStream($localRelativePath);
 
-        Storage::disk($targetDisk)->putStream($targetRelativePath, $stream);
+        Storage::disk($targetDisk)->writeStream($targetRelativePath, $stream);
         $local->delete($localRelativePath);
 
         return $targetRelativePath;
