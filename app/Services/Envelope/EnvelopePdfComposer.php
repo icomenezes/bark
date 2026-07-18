@@ -71,7 +71,9 @@ class EnvelopePdfComposer
     private function downloadToTemp($disk, string $path): string
     {
         $temp = tempnam(sys_get_temp_dir(), 'dl_').'_'.basename($path);
-        file_put_contents($temp, $disk->get($path));
+        $stream = $disk->readStream($path);
+        file_put_contents($temp, $stream, FILE_BINARY);
+        fclose($stream);
         $this->downloadedTemps[] = $temp;
 
         return $temp;
