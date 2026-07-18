@@ -95,8 +95,48 @@ No crontab do www-data (`sudo crontab -u www-data -e`):
 
 - **php8.3-gd** — obrigatório: TCPDF precisa de GD para os PNGs com transparência das assinaturas.
   Conferir: `/usr/bin/php8.3 -m | grep gd`
-- pyHanko — opcional (motor preferido do lacre): `pip install pyHanko pyHanko-cli "pyHanko[image-support]"`.
-  Sem ele, cai no fallback TCPDF (funciona, assinatura única no PDF final).
+- **pyHanko — NÃO é opcional na prática.** É o único motor cuja assinatura passa na validação
+  do ITI (validador oficial do governo). O fallback TCPDF (`SignPdfService`) produz um PDF com
+  `/ByteRange` que não cobre o arquivo inteiro (metadados XMP do TCPDF ficam fora do range
+  assinado) — o ITI acusa **"documento sem assinatura reconhecível ou com assinatura
+  corrompida"**. Mesma falha tanto em `sign-document` quanto no lacre de envelopes. Ver
+  incidente completo em `docs/incidentes/2026-07-18-pyhanko-ausente-tcpdf-invalido.md`.
+
+### Instalar/reinstalar o pyHanko (Ubuntu 24.04+, sem apt python3-pip)
+
+```bash
+apt-get update
+apt-get install -y python3-pip python3-venv
+python3 -m venv /opt/pyhanko-venv
+/opt/pyhanko-venv/bin/pip install --upgrade pip
+/opt/pyhanko-venv/bin/pip install pyHanko pyHanko-cli "pyHanko[image-support]"
+chmod -R o+rX /opt/pyhanko-venv
+
+# confirmar que o www-data (usuário do PHP-FPM) consegue rodar
+sudo -u www-data /opt/pyhanko-venv/bin/pyhanko --version
+
+# qpdf é usado para reparar xref antes de assinar com pyHanko
+apt-get install -y qpdf   # se ainda não tiver
+
+# aplicar: reiniciar php-fpm e o worker (o PdfSignerService tem cache estático por request,
+# mas reiniciar garante que nenhum processo antigo fique preso num estado negativo)
+systemctl restart php8.3-fpm
+systemctl restart assinador-worker
+```
+
+**Importante:** `/opt/pyhanko-venv/bin/pyhanko` é um caminho *hardcoded* como candidato em
+`app/Services/Pdf/PyHankoSigner.php::binary()` — reinstalando exatamente nesse caminho, a
+aplicação detecta sozinha, sem precisar setar `PYHANKO_BIN` no `.env`.
+
+### Como confirmar que está sendo usado
+
+```bash
+cd /var/www/assinador
+sudo -u www-data HOME=/tmp /usr/bin/php8.3 artisan tinker --execute="echo App\Services\Pdf\PyHankoSigner::available() ? 'DISPONIVEL' : 'INDISPONIVEL';"
+```
+
+Ou visualmente: em `/sign-document`, a lista "Documentos assinados anteriormente" tem a
+coluna **Motor** — deve mostrar `PYHANKO`, nunca `TCPDF`, para o documento validar no ITI.
 
 ## Troubleshooting rápido
 
@@ -108,6 +148,7 @@ No crontab do www-data (`sudo crontab -u www-data -e`):
 | `TCPDF ERROR: requires Imagick or GD` | worker rodando no PHP sem GD (8.4) | usar `/usr/bin/php8.3` (unit do systemd já usa) |
 | Passo 3 do wizard sem páginas para clicar | assets/JS desatualizados | `git pull` + `view:clear` + Ctrl+F5; erros agora aparecem em `alert` |
 | Convites não saíram na criação do envelope | falha de mail no `send()` | abrir o envelope → **Reenviar convite** (não precisa recriar) |
+| Documento assinado não valida no site do ITI ("sem assinatura reconhecível ou corrompida") | pyHanko sumiu do host, caiu no fallback TCPDF (ByteRange inválido) | conferir motor: seção acima "Como confirmar que está sendo usado"; reinstalar pyHanko se `INDISPONIVEL` |
 
 ## Checklist de smoke test pós-deploy
 
