@@ -102,9 +102,9 @@ class PdfSignerService
     public function moveToDisk(string $localRelativePath, string $targetDisk, string $targetRelativePath): string
     {
         $local = Storage::disk('local');
-        $content = $local->get($localRelativePath);
+        $stream = $local->readStream($localRelativePath);
 
-        Storage::disk($targetDisk)->put($targetRelativePath, $content);
+        Storage::disk($targetDisk)->putStream($targetRelativePath, $stream);
         $local->delete($localRelativePath);
 
         return $targetRelativePath;
