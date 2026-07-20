@@ -86,11 +86,10 @@ class SignEnvelopeController extends Controller
             return back()->withErrors(['signature' => $e->getMessage()])->withInput();
         }
 
-        return view('public.sign.done', [
-            'signer' => $signer->fresh(),
-            'title' => 'Assinatura registrada!',
-            'message' => 'Quando todos assinarem, você receberá o documento final por e-mail.',
-        ]);
+        return view('public.sign.done', array_merge(
+            ['signer' => $signer->fresh()],
+            $this->completionMessage($signer->fresh())
+        ));
     }
 
     public function decline(Request $request, string $token)
@@ -110,6 +109,26 @@ class SignEnvelopeController extends Controller
     }
 
     // ─── Privados ─────────────────────────────────────────────────────────────
+
+    /** @return array{title: string, message: string} */
+    private function completionMessage(EnvelopeSigner $signer): array
+    {
+        $envelope = $signer->envelope->fresh();
+
+        if ($envelope->allSigned()) {
+            return [
+                'title' => 'Documento assinado com sucesso!',
+                'message' => 'Obrigado por assinar. O documento está concluído.',
+            ];
+        }
+
+        $channel = $signer->channel === 'whatsapp' ? 'WhatsApp' : 'e-mail';
+
+        return [
+            'title' => 'Assinatura registrada!',
+            'message' => "Quando todos assinarem, você receberá o documento final por {$channel}.",
+        ];
+    }
 
     private function findSigner(string $token): EnvelopeSigner
     {

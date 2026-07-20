@@ -82,11 +82,79 @@ class PublicSignFlowTest extends TestCase
 
         $this->post("/sign/{$signer->token}", $this->signPayload())
             ->assertOk()
-            ->assertSee('Assinatura registrada');
+            ->assertSee('Documento assinado com sucesso');
 
         $signer->refresh();
         $this->assertSame('signed', $signer->status);
         Queue::assertPushed(SealEnvelopeJob::class, 1); // único signatário → lacre
+    }
+
+    public function test_single_signer_envelope_shows_completion_message(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        Queue::fake();
+        Mail::fake();
+        $signer = $this->makeSentEnvelope(['auth_method' => 'link']);
+
+        $this->post("/sign/{$signer->token}", $this->signPayload())
+            ->assertOk()
+            ->assertSee('Documento assinado com sucesso')
+            ->assertDontSee('Quando todos assinarem');
+
+        Queue::assertPushed(SealEnvelopeJob::class, 1);
+    }
+
+    public function test_multi_signer_envelope_mentions_email_when_pending(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        Queue::fake();
+        Mail::fake();
+        $envelope = Envelope::factory()->create(['status' => 'sent']);
+        $path = "users/{$envelope->user_id}/envelopes/{$envelope->id}/original.pdf";
+        Storage::disk('documents')->put($path, '%PDF-1.4 fake');
+        $envelope->update(['original_pdf_path' => $path]);
+
+        $first = EnvelopeSigner::factory()->for($envelope)->create([
+            'status' => 'notified', 'auth_method' => 'link', 'channel' => 'email', 'sign_position' => 1,
+        ]);
+        EnvelopeSigner::factory()->for($envelope)->create([
+            'status' => 'pending', 'auth_method' => 'link', 'channel' => 'email', 'sign_position' => 2,
+        ]);
+
+        $this->post("/sign/{$first->token}", $this->signPayload())
+            ->assertOk()
+            ->assertSee('Assinatura registrada')
+            ->assertSee('por e-mail')
+            ->assertDontSee('Documento assinado com sucesso');
+
+        Queue::assertNotPushed(SealEnvelopeJob::class);
+    }
+
+    public function test_multi_signer_envelope_mentions_whatsapp_when_pending(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        Queue::fake();
+        Mail::fake();
+        $envelope = Envelope::factory()->create(['status' => 'sent']);
+        $path = "users/{$envelope->user_id}/envelopes/{$envelope->id}/original.pdf";
+        Storage::disk('documents')->put($path, '%PDF-1.4 fake');
+        $envelope->update(['original_pdf_path' => $path]);
+
+        $first = EnvelopeSigner::factory()->for($envelope)->create([
+            'status' => 'notified', 'auth_method' => 'link', 'channel' => 'whatsapp',
+            'whatsapp' => '11999998888', 'sign_position' => 1,
+        ]);
+        EnvelopeSigner::factory()->for($envelope)->create([
+            'status' => 'pending', 'auth_method' => 'link', 'channel' => 'email', 'sign_position' => 2,
+        ]);
+
+        $this->post("/sign/{$first->token}", $this->signPayload())
+            ->assertOk()
+            ->assertSee('Assinatura registrada')
+            ->assertSee('por WhatsApp');
     }
 
     public function test_otp_signer_requires_valid_code(): void
