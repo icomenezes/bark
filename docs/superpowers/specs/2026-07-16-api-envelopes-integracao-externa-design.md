@@ -1,6 +1,14 @@
 # API de Envelopes — Integração Externa (Delphi/outros sistemas)
 
-Data: 2026-07-16
+Data: 2026-07-16 (atualizado em 2026-07-20 — ver nota de atualização abaixo)
+
+> **Atualização 2026-07-20:** `POST /api/v1/envelopes` passou a aceitar o campo
+> opcional `send_signed_copy` (ver seção do payload abaixo). Também foi
+> adicionada uma API irmã, `POST /api/v1/sign-document`, para assinar um PDF
+> avulso (sem envelope, sem coleta de assinatura de terceiros) com um
+> certificado próprio do usuário — ver
+> `docs/superpowers/specs/2026-07-20-conclusao-adaptativa-copia-opcional-assinatura-avulsa-design.md`
+> para o design completo de ambas as mudanças.
 
 ## Contexto
 
@@ -48,6 +56,7 @@ Payload JSON:
   "signer_name": "João da Silva",
   "signer_email": "joao@example.com",
   "signer_whatsapp": "11999998888",
+  "send_signed_copy": true,
   "pdf_base64": "JVBERi0xLjQK..."
 }
 ```
@@ -62,6 +71,13 @@ Regras:
   `signer_whatsapp` for informado, `EnvelopeService::notifySigner()` também envia
   um espelho por WhatsApp automaticamente — comportamento já existente, reaproveitado
   sem mudança
+- `send_signed_copy`: opcional, boolean, **default `true`** (adicionado em
+  2026-07-20). Quando `false`, o signatário não recebe a notificação de
+  conclusão com o PDF final (nem por e-mail nem por WhatsApp) — só o convite
+  inicial para assinar. Usado quando o dono da conta quer manter o documento
+  assinado só em sua posse (ex.: promissórias assinadas por clientes via API).
+  O e-mail de conclusão ao dono do envelope (remetente) nunca é afetado por
+  este campo. Persistido em `envelope_signers.send_signed_copy`
 - `pdf_base64`: obrigatório, string base64 que decodifica para um PDF válido
   (assinatura `%PDF-` nos primeiros bytes), tamanho decodificado até 15 MB (mesmo
   limite do upload web)
@@ -174,3 +190,6 @@ vocabulário mais claro à integração externa):
 - Teste: `GET /api/v1/envelopes/{id}` reflete `status` mapeado corretamente nos
   6 estados de `envelopes.status`
 - Teste: geração/revogação de token na tela admin de edição de usuário
+- Teste (adicionado 2026-07-20): `send_signed_copy` omitido → persistido como
+  `true`; `send_signed_copy: false` → persistido como `false` em
+  `envelope_signers.send_signed_copy`
