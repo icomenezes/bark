@@ -82,6 +82,10 @@ class SealEnvelopeJob implements ShouldQueue
 
             Mail::to($envelope->user->email)->send(new EnvelopeCompleted($envelope));
             foreach ($envelope->signers as $signer) {
+                if (! $signer->send_signed_copy) {
+                    continue;
+                }
+
                 if ($signer->channel === 'whatsapp') {
                     $notification->sendWhatsAppTo($signer->whatsapp,
                         "✅ *Documento assinado* — O documento *{$envelope->title}* foi completado e assinado por todos.\n".

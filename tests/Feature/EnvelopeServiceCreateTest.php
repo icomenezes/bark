@@ -137,4 +137,32 @@ class EnvelopeServiceCreateTest extends TestCase
         $this->expectException(\RuntimeException::class);
         app(EnvelopeService::class)->send($envelope);
     }
+
+    public function test_create_defaults_send_signed_copy_to_true_when_omitted(): void
+    {
+        Storage::fake('documents');
+        $user = User::factory()->create(['role' => 'client']);
+        $envelope = $this->makeEnvelope($user);
+
+        $this->assertTrue($envelope->signers->first()->send_signed_copy);
+    }
+
+    public function test_create_respects_send_signed_copy_false(): void
+    {
+        Storage::fake('documents');
+        $user = User::factory()->create(['role' => 'client']);
+        $pdf = UploadedFile::fake()->createWithContent('contrato.pdf', '%PDF-1.4 fake');
+
+        $envelope = app(EnvelopeService::class)->create($user, $pdf, [
+            'title' => 'Nota Promissória',
+            'signing_order' => 'parallel',
+            'signers' => [
+                ['name' => 'Ana', 'email' => 'ana@x.com', 'channel' => 'email', 'auth_method' => 'link',
+                 'send_signed_copy' => false,
+                 'fields' => [['page' => 1, 'x' => 100, 'y' => 200, 'w' => 120, 'h' => 40]]],
+            ],
+        ]);
+
+        $this->assertFalse($envelope->signers->first()->send_signed_copy);
+    }
 }

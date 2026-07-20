@@ -43,6 +43,7 @@ class EnvelopeApiController extends Controller
             'signer_name' => ['required', 'string', 'max:255'],
             'signer_email' => ['required', 'email'],
             'signer_whatsapp' => ['nullable', 'string', 'max:20'],
+            'send_signed_copy' => ['nullable', 'boolean'],
             'pdf_base64' => ['required', 'string'],
         ]);
 
@@ -63,6 +64,7 @@ class EnvelopeApiController extends Controller
                         'email' => $request->input('signer_email'),
                         'whatsapp' => $request->input('signer_whatsapp'),
                         'auth_method' => 'link',
+                        'send_signed_copy' => $request->boolean('send_signed_copy', true),
                         'fields' => [
                             ['page' => $pageCount, 'x' => 350, 'y' => 750, 'w' => 150, 'h' => 50],
                         ],

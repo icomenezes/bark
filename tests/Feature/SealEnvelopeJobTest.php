@@ -161,4 +161,24 @@ class SealEnvelopeJobTest extends TestCase
         $this->assertSame('completed', $envelope->status);
         Storage::disk('documents')->assertExists($envelope->final_pdf_path);
     }
+
+    public function test_skips_completion_email_for_signer_with_send_signed_copy_false(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        Mail::fake();
+        $this->configureRealPlatformCertificate();
+        $envelope = $this->makeSignedEnvelope();
+        $envelope->signers()->update(['send_signed_copy' => false]);
+
+        (new SealEnvelopeJob($envelope))->handle(
+            app(\App\Services\Envelope\EvidenceReportGenerator::class),
+            app(\App\Services\Envelope\EnvelopePdfComposer::class),
+            app(\App\Services\Envelope\EnvelopeService::class),
+            app(NotificationService::class),
+        );
+
+        // só o remetente recebe — o único signatário tem send_signed_copy=false
+        Mail::assertSent(EnvelopeCompleted::class, 1);
+    }
 }

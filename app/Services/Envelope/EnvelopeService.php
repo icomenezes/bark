@@ -49,6 +49,7 @@ class EnvelopeService
                     'channel' => $s['channel'] ?? 'email',
                     'auth_method' => $s['auth_method'],
                     'sign_position' => $i + 1,
+                    'send_signed_copy' => $s['send_signed_copy'] ?? true,
                 ]);
                 $signer->fields()->createMany($s['fields']);
             }
@@ -208,6 +209,10 @@ class EnvelopeService
     {
         Mail::to($envelope->user->email)->send(new \App\Mail\Envelopes\EnvelopeCompleted($envelope));
         foreach ($envelope->signers as $signer) {
+            if (! $signer->send_signed_copy) {
+                continue;
+            }
+
             if ($signer->channel === 'whatsapp') {
                 $downloadUrl = route('public.sign.document', $signer->token);
                 $this->notification->sendWhatsAppTo($signer->whatsapp,

@@ -237,4 +237,35 @@ class EnvelopeApiControllerTest extends TestCase
             ->getJson("/api/v1/envelopes/{$envelope->id}")
             ->assertNotFound();
     }
+
+    public function test_send_signed_copy_defaults_to_true(): void
+    {
+        Storage::fake('documents');
+        Mail::fake();
+        $this->configurePlatformCertificate();
+        $user = $this->userWithPlan();
+        $token = $user->createToken('api')->plainTextToken;
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/v1/envelopes', $this->validPayload());
+
+        $this->assertTrue(Envelope::first()->signers->first()->send_signed_copy);
+    }
+
+    public function test_send_signed_copy_false_is_persisted(): void
+    {
+        Storage::fake('documents');
+        Mail::fake();
+        $this->configurePlatformCertificate();
+        $user = $this->userWithPlan();
+        $token = $user->createToken('api')->plainTextToken;
+
+        $payload = array_merge($this->validPayload(), ['send_signed_copy' => false]);
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/v1/envelopes', $payload)
+            ->assertCreated();
+
+        $this->assertFalse(Envelope::first()->signers->first()->send_signed_copy);
+    }
 }
