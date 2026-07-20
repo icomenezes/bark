@@ -40,11 +40,6 @@
         </div>
     @endif
 
-    {{-- Documento --}}
-    <div class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
-        <iframe src="{{ route('public.sign.document', $signer->token) }}" class="w-full bg-white" style="height:70vh"></iframe>
-    </div>
-
     {{-- Formulário de assinatura --}}
     <form method="POST" action="{{ route('public.sign.store', $signer->token) }}" @submit="prepare($event)"
           class="bg-gray-900 border border-gray-800 rounded-lg p-5 space-y-4">
@@ -129,6 +124,17 @@
             </button>
         </div>
     </form>
+
+    {{-- Documento --}}
+    <div class="flex items-center gap-2 text-xs text-gray-500 px-1">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+        </svg>
+        Role para conferir o documento completo abaixo
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+        <iframe src="{{ route('public.sign.document', $signer->token) }}" class="w-full bg-white" style="height:70vh"></iframe>
+    </div>
 
     {{-- Recusa --}}
     <details class="bg-gray-900 border border-gray-800 rounded-lg p-5">
