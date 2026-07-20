@@ -96,4 +96,18 @@ class EnvelopeModelTest extends TestCase
 
         $this->assertSame('whatsapp', $signer->fresh()->channel);
     }
+
+    public function test_signer_defaults_to_send_signed_copy_true(): void
+    {
+        $signer = EnvelopeSigner::factory()->create();
+
+        $this->assertTrue($signer->fresh()->send_signed_copy);
+    }
+
+    public function test_signer_send_signed_copy_can_be_set_false(): void
+    {
+        $signer = EnvelopeSigner::factory()->create(['send_signed_copy' => false]);
+
+        $this->assertFalse($signer->fresh()->send_signed_copy);
+    }
 }

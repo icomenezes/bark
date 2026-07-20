@@ -13,7 +13,7 @@ class EnvelopeSigner extends Model
     use HasFactory;
 
     protected $fillable = [
-        'envelope_id', 'name', 'email', 'whatsapp', 'cpf', 'channel',
+        'envelope_id', 'name', 'email', 'whatsapp', 'cpf', 'channel', 'send_signed_copy',
         'auth_method', 'sign_position', 'token', 'status',
         'signature_image_path', 'signature_type',
         'otp_code', 'otp_expires_at', 'otp_attempts',
@@ -27,6 +27,7 @@ class EnvelopeSigner extends Model
         return [
             'otp_expires_at' => 'datetime',
             'signed_at' => 'datetime',
+            'send_signed_copy' => 'boolean',
         ];
     }
 
