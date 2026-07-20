@@ -114,6 +114,20 @@ class SignDocumentApiControllerTest extends TestCase
         $response->assertUnprocessable();
     }
 
+    public function test_rejects_expired_certificate(): void
+    {
+        $user = $this->userWithPlan();
+        $certificate = $this->attachRealCertificate($user);
+        $certificate->update(['expires_at' => now()->subDay()]);
+        $token = $user->createToken('api')->plainTextToken;
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/v1/sign-document', ['pdf_base64' => $this->makeSourcePdfBase64()]);
+
+        $response->assertUnprocessable();
+        $this->assertStringContainsString('expirado', $response->json('message'));
+    }
+
     public function test_requires_a_certificate_when_none_configured(): void
     {
         $user = $this->userWithPlan();
