@@ -76,6 +76,29 @@
 
         {{-- Passo 2: Signatários --}}
         <div x-show="step === 2" x-cloak class="bg-gray-900 border border-gray-800 rounded-lg p-5 space-y-4">
+            <div class="flex flex-wrap items-center gap-3 pb-2 border-b border-gray-800">
+                <div class="relative flex-1 min-w-[200px]">
+                    <input type="text" placeholder="Buscar signatário salvo..." x-model="signerQuery" @input.debounce.300ms="searchSigners()"
+                           class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+                    <div x-show="signerResults.length > 0" x-cloak
+                         class="absolute z-10 mt-1 w-full bg-gray-800 border border-gray-700 rounded shadow-lg max-h-48 overflow-auto">
+                        <template x-for="result in signerResults" :key="result.id">
+                            <button type="button" @click="addSavedSigner(result)"
+                                    class="block w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-gray-700"
+                                    x-text="result.name"></button>
+                        </template>
+                    </div>
+                </div>
+                @if ($groups->isNotEmpty())
+                    <select @change="if ($event.target.value) { addGroup($event.target.value); $event.target.value = ''; }"
+                            class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm">
+                        <option value="">Carregar grupo...</option>
+                        @foreach ($groups as $group)
+                            <option value="{{ $group->id }}">{{ $group->name }} ({{ $group->members->count() }})</option>
+                        @endforeach
+                    </select>
+                @endif
+            </div>
             <template x-for="(signer, i) in signers" :key="i">
                 <div class="border border-gray-800 rounded-lg p-4 space-y-3">
                     <div class="flex items-center justify-between">
@@ -103,6 +126,10 @@
                             <option value="whatsapp_otp" x-show="signer.channel === 'whatsapp'">Código por WhatsApp</option>
                         </select>
                     </div>
+                    <label class="flex items-center gap-2 text-xs text-gray-400">
+                        <input type="checkbox" x-model="signer.save_as_contact">
+                        Salvar para reutilizar depois
+                    </label>
                 </div>
             </template>
             <button type="button" @click="addSigner()" x-show="signers.length < 20"
@@ -152,6 +179,7 @@
 @push('scripts')
 @include('client.partials.pdfjs-loader')
 <script>window.__envelopeDefaultChannel = '{{ $defaultChannel }}';</script>
+<script>window.__envelopeGroups = @json($groupsForWizard);</script>
 <script>
 // Documento PDF.js fora do estado do Alpine: o Proxy reativo quebra os
 // campos privados internos do PDF.js (getPage lança TypeError silencioso)
@@ -162,13 +190,40 @@ function envelopeWizard() {
         step: 1, signers: [], selected: 0, fields: [], // fields: [{signerIdx, page, xPt, yPt}]
         numPages: 0, scale: 1.3, defaultChannel: window.__envelopeDefaultChannel || 'email',
         colors: ['#2563eb','#dc2626','#16a34a','#9333ea','#ea580c','#0891b2','#db2777','#65a30d'],
+        signerQuery: '', signerResults: [], groups: window.__envelopeGroups || [],
 
-        addSigner() { if (this.signers.length < 20) this.signers.push({name:'', email:'', channel: this.defaultChannel, auth_method:'link', whatsapp:''}); },
+        addSigner() { if (this.signers.length < 20) this.signers.push({name:'', email:'', channel: this.defaultChannel, auth_method:'link', whatsapp:'', saved_signer_id: null, save_as_contact: false}); },
         removeSigner(i) {
             this.signers.splice(i, 1);
             this.fields = this.fields.filter(f => f.signerIdx !== i)
                 .map(f => f.signerIdx > i ? {...f, signerIdx: f.signerIdx - 1} : f);
             if (this.selected >= this.signers.length) this.selected = 0;
+        },
+        async searchSigners() {
+            if (this.signerQuery.trim().length < 2) { this.signerResults = []; return; }
+            const res = await fetch(`/signatarios/buscar?q=${encodeURIComponent(this.signerQuery)}`);
+            this.signerResults = res.ok ? await res.json() : [];
+        },
+        addSavedSigner(result) {
+            if (this.signers.length >= 20) return;
+            this.signers.push({
+                name: result.name, channel: result.channel, email: result.email || '',
+                whatsapp: result.whatsapp || '', auth_method: result.auth_method,
+                saved_signer_id: result.id, save_as_contact: false,
+            });
+            this.signerQuery = ''; this.signerResults = [];
+        },
+        addGroup(groupId) {
+            const group = this.groups.find(g => String(g.id) === String(groupId));
+            if (!group) return;
+            group.members.forEach(m => {
+                if (this.signers.length >= 20) return;
+                this.signers.push({
+                    name: m.name, channel: m.channel, email: m.email || '',
+                    whatsapp: m.whatsapp || '', auth_method: m.auth_method,
+                    saved_signer_id: m.saved_signer_id, save_as_contact: false,
+                });
+            });
         },
         onChannelChange(signer) {
             const allowed = signer.channel === 'whatsapp' ? ['link', 'whatsapp_otp'] : ['link', 'email_otp'];

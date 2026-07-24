@@ -57,10 +57,9 @@ class SignerDirectoryController extends Controller
 
     public function storeGroup(Request $request)
     {
-        $request->validate(['name' => ['required', 'string', 'max:255'], 'members' => ['array']]);
+        $request->validate(['name' => ['required', 'string', 'max:255'], 'members' => ['array'], 'members.*' => ['integer']]);
 
-        $group = $this->directory->createGroup(auth()->user(), $request->input('name'));
-        $group->members()->sync($request->input('members', []));
+        $this->directory->createGroup(auth()->user(), $request->input('name'), $request->input('members', []));
 
         return back()->with('success', 'Grupo criado.');
     }
@@ -68,7 +67,7 @@ class SignerDirectoryController extends Controller
     public function updateGroup(Request $request, SignerGroup $signerGroup)
     {
         $this->authorizeOwnerGroup($signerGroup);
-        $request->validate(['name' => ['required', 'string', 'max:255'], 'members' => ['array']]);
+        $request->validate(['name' => ['required', 'string', 'max:255'], 'members' => ['array'], 'members.*' => ['integer']]);
 
         $this->directory->updateGroup($signerGroup, $request->input('name'), $request->input('members', []));
 

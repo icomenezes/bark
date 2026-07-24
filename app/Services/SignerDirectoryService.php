@@ -41,7 +41,8 @@ class SignerDirectoryService
         $signer->delete();
     }
 
-    public function createGroup(User $user, string $name): SignerGroup
+    /** @param  list<int>  $savedSignerIds */
+    public function createGroup(User $user, string $name, array $savedSignerIds = []): SignerGroup
     {
         if ($user->signerGroups()->count() >= self::MAX_GROUPS_PER_USER) {
             throw ValidationException::withMessages([
@@ -49,16 +50,32 @@ class SignerDirectoryService
             ]);
         }
 
-        return $user->signerGroups()->create(['name' => $name]);
+        $group = $user->signerGroups()->create(['name' => $name]);
+        $group->members()->sync($this->ownedSignerIds($user, $savedSignerIds));
+
+        return $group;
     }
 
     /** @param  list<int>  $savedSignerIds */
     public function updateGroup(SignerGroup $group, string $name, array $savedSignerIds): SignerGroup
     {
         $group->update(['name' => $name]);
-        $group->members()->sync($savedSignerIds);
+        $group->members()->sync($this->ownedSignerIds($group->user, $savedSignerIds));
 
         return $group;
+    }
+
+    /**
+     * Filtra os IDs para só os signatários salvos do próprio usuário — nunca
+     * confiar em IDs de saved_signers vindos direto do request (IDOR: um
+     * usuário poderia tentar associar contatos de outro cliente ao seu grupo).
+     *
+     * @param  list<int>  $savedSignerIds
+     * @return list<int>
+     */
+    private function ownedSignerIds(User $user, array $savedSignerIds): array
+    {
+        return $user->savedSigners()->whereIn('id', $savedSignerIds)->pluck('id')->all();
     }
 
     public function deleteGroup(SignerGroup $group): void

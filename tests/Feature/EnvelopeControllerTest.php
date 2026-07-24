@@ -238,4 +238,15 @@ class EnvelopeControllerTest extends TestCase
         $this->actingAs($user)->get('/envelopes/create')
             ->assertOk()->assertSee("__envelopeDefaultChannel = 'email'", false);
     }
+
+    public function test_create_exposes_the_users_signer_groups_to_the_wizard(): void
+    {
+        $user = User::factory()->create(['role' => 'client']);
+        $group = \App\Models\SignerGroup::factory()->create(['user_id' => $user->id, 'name' => 'Diretoria']);
+        $signer = \App\Models\SavedSigner::factory()->create(['user_id' => $user->id, 'name' => 'Fulano']);
+        $group->members()->attach($signer->id);
+
+        $this->actingAs($user)->get('/envelopes/create')
+            ->assertOk()->assertSee('Diretoria');
+    }
 }

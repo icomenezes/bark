@@ -35,8 +35,21 @@ class EnvelopeController extends Controller
     {
         $user = auth()->user();
         $defaultChannel = $user->whatsapp_envelope_enabled ? $user->default_envelope_channel : 'email';
+        $groups = $user->signerGroups()->with('members')->orderBy('name')->get();
+        $groupsForWizard = $groups->map(fn ($group) => [
+            'id' => $group->id,
+            'name' => $group->name,
+            'members' => $group->members->map(fn ($member) => [
+                'name' => $member->name,
+                'channel' => $member->channel,
+                'email' => $member->email,
+                'whatsapp' => $member->whatsapp,
+                'auth_method' => $member->auth_method,
+                'saved_signer_id' => $member->id,
+            ])->values(),
+        ])->values();
 
-        return view('client.envelopes.create', compact('defaultChannel'));
+        return view('client.envelopes.create', compact('defaultChannel', 'groups', 'groupsForWizard'));
     }
 
     public function store(Request $request)
