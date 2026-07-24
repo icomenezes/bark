@@ -110,4 +110,18 @@ class EnvelopeModelTest extends TestCase
 
         $this->assertFalse($signer->fresh()->send_signed_copy);
     }
+
+    public function test_saved_signer_id_becomes_null_when_saved_signer_is_deleted(): void
+    {
+        $savedSigner = \App\Models\SavedSigner::factory()->create();
+        $envelope = Envelope::factory()->create(['user_id' => $savedSigner->user_id]);
+        $signer = EnvelopeSigner::factory()->for($envelope)->create(['saved_signer_id' => $savedSigner->id]);
+
+        $this->assertSame($savedSigner->id, $signer->fresh()->saved_signer_id);
+        $this->assertTrue($signer->fresh()->savedSigner->is($savedSigner));
+
+        $savedSigner->delete();
+
+        $this->assertNull($signer->fresh()->saved_signer_id);
+    }
 }

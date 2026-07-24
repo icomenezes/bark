@@ -13,7 +13,7 @@ class EnvelopeSigner extends Model
     use HasFactory;
 
     protected $fillable = [
-        'envelope_id', 'name', 'email', 'whatsapp', 'cpf', 'channel', 'send_signed_copy',
+        'envelope_id', 'saved_signer_id', 'name', 'email', 'whatsapp', 'cpf', 'channel', 'send_signed_copy',
         'auth_method', 'sign_position', 'token', 'status',
         'signature_image_path', 'signature_type',
         'otp_code', 'otp_expires_at', 'otp_attempts',
@@ -41,6 +41,11 @@ class EnvelopeSigner extends Model
     public function envelope(): BelongsTo
     {
         return $this->belongsTo(Envelope::class);
+    }
+
+    public function savedSigner(): BelongsTo
+    {
+        return $this->belongsTo(SavedSigner::class);
     }
 
     public function fields(): HasMany
