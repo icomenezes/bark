@@ -53,11 +53,14 @@
                         <span class="text-white">{{ $signer->name }}</span>
                         <span class="text-gray-500 text-xs ml-2">{{ $signer->email ?? $signer->whatsapp }}</span>
                     </div>
-                    <form method="POST" action="{{ route('signers.destroy', $signer) }}"
-                          onsubmit="return confirm('Remover este signatário?')">
-                        @csrf @method('DELETE')
-                        <button type="submit" class="text-xs text-red-400 hover:text-red-300">remover</button>
-                    </form>
+                    <div class="flex items-center gap-3">
+                        <a href="{{ route('signers.edit', $signer) }}" class="text-xs text-gray-400 hover:text-white">editar</a>
+                        <form method="POST" action="{{ route('signers.destroy', $signer) }}"
+                              onsubmit="return confirm('Remover este signatário?')">
+                            @csrf @method('DELETE')
+                            <button type="submit" class="text-xs text-red-400 hover:text-red-300">remover</button>
+                        </form>
+                    </div>
                 </div>
             @empty
                 <p class="text-sm text-gray-500">Nenhum signatário salvo ainda.</p>
@@ -90,11 +93,14 @@
                         <span class="text-white">{{ $group->name }}</span>
                         <span class="text-gray-500 text-xs ml-2">{{ $group->members->count() }} membro(s)</span>
                     </div>
-                    <form method="POST" action="{{ route('signers.groups.destroy', $group) }}"
-                          onsubmit="return confirm('Remover este grupo?')">
-                        @csrf @method('DELETE')
-                        <button type="submit" class="text-xs text-red-400 hover:text-red-300">remover</button>
-                    </form>
+                    <div class="flex items-center gap-3">
+                        <a href="{{ route('signers.groups.edit', $group) }}" class="text-xs text-gray-400 hover:text-white">editar</a>
+                        <form method="POST" action="{{ route('signers.groups.destroy', $group) }}"
+                              onsubmit="return confirm('Remover este grupo?')">
+                            @csrf @method('DELETE')
+                            <button type="submit" class="text-xs text-red-400 hover:text-red-300">remover</button>
+                        </form>
+                    </div>
                 </div>
             @empty
                 <p class="text-sm text-gray-500">Nenhum grupo criado ainda.</p>
