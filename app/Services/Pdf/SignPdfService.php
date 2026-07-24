@@ -38,6 +38,8 @@ class SignPdfService
     /** Imagem principal do stamp (ex.: assinatura + selo compostos); rubricas usam signImagePath. */
     private ?string $mainImagePath = null;
 
+    private ?string $verificationFooterCode = null;
+
     private const TSA_URL = 'http://timestamp.digicert.com';
 
     public function __construct(string $pdfDocument = '')
@@ -95,6 +97,11 @@ class SignPdfService
     public function setLogoImage(string $path): void
     {
         $this->logoImagePath = $path;
+    }
+
+    public function setVerificationFooter(string $code): void
+    {
+        $this->verificationFooterCode = $code;
     }
 
     // ─── Criação de PDF ──────────────────────────────────────────────────────
@@ -250,6 +257,27 @@ class SignPdfService
                 $rh
             );
         }
+
+        if ($this->verificationFooterCode !== null) {
+            $this->stampVerificationFooter();
+        }
+    }
+
+    /** Faixa fina no rodapé da página com o código de verificação público (unidade mm — PDF_UNIT). */
+    private function stampVerificationFooter(): void
+    {
+        $url = rtrim(config('app.url'), '/')."/verificar/{$this->verificationFooterCode}";
+        $k = $this->pdf->getScaleFactor();
+        $pageHeightMm = $this->pdf->getPageHeight();
+        $pageWidthMm = $this->pdf->getPageWidth();
+
+        $this->pdf->SetFont('helvetica', '', 6.5);
+        $this->pdf->SetTextColor(153, 153, 153);
+        $this->pdf->SetXY(10, $pageHeightMm - (8 / $k) - 2);
+        $this->pdf->Cell($pageWidthMm - 20, 10 / $k,
+            "Código do documento {$this->verificationFooterCode} · assinado eletronicamente · Verifique em {$url}",
+            0, 0, 'C');
+        $this->pdf->SetTextColor(0, 0, 0);
     }
 
     // ─── Saída ───────────────────────────────────────────────────────────────
