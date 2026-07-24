@@ -76,20 +76,42 @@ class EvidenceReportGenerator
         return $path;
     }
 
-    /** Moldura: traço sólido espesso em primary_color, com friso interno mais claro. */
+    /** Moldura cross-hatch: segmentos diagonais densos em dois tons de primary_color, delimitada por um traço sólido. */
     private function drawBorder(\TCPDF $pdf, array $primary, array $primaryLight): void
     {
         $w = $pdf->getPageWidth();
         $h = $pdf->getPageHeight();
         $b = self::BORDER_WIDTH;
+        $step = 7;
 
-        $pdf->SetLineWidth($b);
-        $pdf->SetDrawColorArray($primary);
-        $pdf->Rect($b / 2, $b / 2, $w - $b, $h - $b);
+        $pdf->SetLineWidth(1.6);
 
+        // topo e base: hachurado diagonal cobrindo toda a espessura da moldura
+        for ($x = -$b; $x < $w + $b; $x += $step) {
+            $pdf->SetDrawColorArray($primary);
+            $pdf->Line($x, 0, $x + $b, $b);
+            $pdf->Line($x, $h, $x + $b, $h - $b);
+
+            $pdf->SetDrawColorArray($primaryLight);
+            $pdf->Line($x + $step / 2, 0, $x + $step / 2 + $b, $b);
+            $pdf->Line($x + $step / 2, $h, $x + $step / 2 + $b, $h - $b);
+        }
+
+        // laterais: mesmo hachurado, só na faixa vertical de espessura $b
+        for ($y = $b; $y < $h - $b; $y += $step) {
+            $pdf->SetDrawColorArray($primary);
+            $pdf->Line(0, $y, $b, $y + $b);
+            $pdf->Line($w, $y, $w - $b, $y + $b);
+
+            $pdf->SetDrawColorArray($primaryLight);
+            $pdf->Line(0, $y + $step / 2, $b, $y + $step / 2 + $b);
+            $pdf->Line($w, $y + $step / 2, $w - $b, $y + $step / 2 + $b);
+        }
+
+        // traço sólido delimitando a área tramada, para um acabamento nítido
         $pdf->SetLineWidth(2);
-        $pdf->SetDrawColorArray($primaryLight);
-        $pdf->Rect($b - 3, $b - 3, $w - ($b - 3) * 2, $h - ($b - 3) * 2);
+        $pdf->SetDrawColorArray($primary);
+        $pdf->Rect($b, $b, $w - $b * 2, $h - $b * 2);
 
         $pdf->SetLineWidth(0.5);
     }
