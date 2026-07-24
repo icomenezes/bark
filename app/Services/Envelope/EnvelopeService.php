@@ -32,6 +32,7 @@ class EnvelopeService
                 'user_id' => $user->id,
                 'title' => $data['title'],
                 'message' => $data['message'] ?? null,
+                'verification_code' => (string) \Illuminate\Support\Str::uuid(),
                 'signing_order' => $data['signing_order'],
                 'expires_at' => $data['expires_at'] ?? null,
                 'original_pdf_path' => 'pending',

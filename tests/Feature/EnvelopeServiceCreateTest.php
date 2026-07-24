@@ -49,6 +49,8 @@ class EnvelopeServiceCreateTest extends TestCase
         $envelope = $this->makeEnvelope($user);
 
         $this->assertSame('draft', $envelope->status);
+        $this->assertNotEmpty($envelope->verification_code);
+        $this->assertTrue(\Illuminate\Support\Str::isUuid($envelope->verification_code));
         $this->assertSame("users/{$user->id}/envelopes/{$envelope->id}/original.pdf", $envelope->original_pdf_path);
         Storage::disk('documents')->assertExists($envelope->original_pdf_path);
         $this->assertSame(hash('sha256', '%PDF-1.4 fake'), $envelope->sha256_original);
