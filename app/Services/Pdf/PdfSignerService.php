@@ -20,6 +20,8 @@ class PdfSignerService
     /** Composição assinatura+selo usada como imagem principal do carimbo (rubricas ficam sem selo). */
     private ?string $sealComposite = null;
 
+    private ?string $verificationCode = null;
+
     private function __construct(
         private string $pfxPath,
         private string $password,
@@ -92,6 +94,11 @@ class PdfSignerService
     public function engine(): string
     {
         return PyHankoSigner::available() ? 'pyhanko' : 'tcpdf';
+    }
+
+    public function setVerificationCode(string $code): void
+    {
+        $this->verificationCode = $code;
     }
 
     /**
@@ -213,6 +220,9 @@ class PdfSignerService
         }
         if ($this->logoImage) {
             $svc->setLogoImage($this->logoImage);
+        }
+        if ($this->verificationCode) {
+            $svc->setVerificationFooter($this->verificationCode);
         }
 
         return $svc;

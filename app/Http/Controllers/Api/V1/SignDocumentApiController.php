@@ -51,12 +51,23 @@ class SignDocumentApiController extends Controller
         try {
             $pageCount = (new Fpdi)->setSourceFile($pdfPath);
             $position = $this->resolvePosition($request->input('field', []), $pageCount);
+            $verificationCode = (string) \Illuminate\Support\Str::uuid();
 
             $signer = PdfSignerService::fromCertificate($certificate);
+            $signer->setVerificationCode($verificationCode);
             $relative = $signer->signExisting($pdfPath, initialAllPages: false, position: $position, useTsa: false);
 
             $targetPath = "users/{$user->id}/signed/".basename($relative);
             $signer->moveToDisk($relative, 'documents', $targetPath);
+
+            \App\Models\SignedDocument::create([
+                'user_id' => $user->id,
+                'certificate_id' => $certificate->id,
+                'verification_code' => $verificationCode,
+                'title' => 'Documento avulso',
+                'sha256' => hash('sha256', Storage::disk('documents')->get($targetPath)),
+                'signed_at' => now(),
+            ]);
 
             $this->accessLog->log($user, 'document_signed', [
                 'certificate_id' => $certificate->id,
@@ -65,6 +76,7 @@ class SignDocumentApiController extends Controller
                 'file' => basename($targetPath),
                 'original_name' => 'documento.pdf',
                 'source' => 'api',
+                'verification_code' => $verificationCode,
             ]);
         } catch (\RuntimeException $e) {
             return $this->unprocessable($e->getMessage());

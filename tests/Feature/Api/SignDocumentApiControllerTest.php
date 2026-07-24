@@ -167,6 +167,26 @@ class SignDocumentApiControllerTest extends TestCase
         $this->assertStringContainsString('limite', $response->json('message'));
     }
 
+    public function test_creates_signed_document_record_with_verification_code(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        $user = $this->userWithPlan();
+        $this->attachRealCertificate($user);
+        $token = $user->createToken('api')->plainTextToken;
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/v1/sign-document', ['pdf_base64' => $this->makeSourcePdfBase64()]);
+
+        $response->assertOk();
+
+        $this->assertDatabaseCount('signed_documents', 1);
+        $record = \App\Models\SignedDocument::first();
+        $this->assertSame($user->id, $record->user_id);
+        $this->assertTrue(\Illuminate\Support\Str::isUuid($record->verification_code));
+        $this->assertNotEmpty($record->sha256);
+    }
+
     public function test_accepts_custom_field_position(): void
     {
         Storage::fake('local');
