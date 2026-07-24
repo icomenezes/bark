@@ -75,6 +75,18 @@ class User extends Authenticatable
         return $this->belongsTo(Certificate::class, 'signing_certificate_id');
     }
 
+    // ── Signatários salvos e grupos ──────────────────────────────────────────
+
+    public function savedSigners(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(SavedSigner::class);
+    }
+
+    public function signerGroups(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(SignerGroup::class);
+    }
+
     // ── Plano de uso ─────────────────────────────────────────────────────────
 
     public function plan()
