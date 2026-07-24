@@ -63,4 +63,25 @@ class EnvelopePdfComposerTest extends TestCase
         @unlink($result['path']);
         @unlink($evidence);
     }
+
+    public function test_stamps_verification_footer_on_every_original_page(): void
+    {
+        Storage::fake('documents');
+
+        $envelope = Envelope::factory()->create([
+            'status' => 'sent',
+            'verification_code' => '11111111-1111-1111-1111-111111111111',
+        ]);
+        Storage::disk('documents')->put("envelopes/{$envelope->id}/original.pdf", file_get_contents($this->makeSourcePdf(2)));
+        $envelope->update(['original_pdf_path' => "envelopes/{$envelope->id}/original.pdf"]);
+
+        $evidence = (new EvidenceReportGenerator)->generate($envelope->fresh());
+        $result = (new EnvelopePdfComposer)->compose($envelope->fresh(), $evidence, compress: false);
+
+        $raw = file_get_contents($result['path']);
+        $this->assertStringContainsString('11111111-1111-1111-1111-111111111111', $raw);
+
+        @unlink($result['path']);
+        @unlink($evidence);
+    }
 }

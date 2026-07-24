@@ -8,7 +8,8 @@ use setasign\Fpdi\Tcpdf\Fpdi;
 
 /**
  * Monta o PDF final do envelope (ANTES da assinatura digital):
- * original + carimbos das assinaturas nas posições marcadas + páginas de evidências.
+ * original + carimbos das assinaturas nas posições marcadas + rodapé de
+ * rastreabilidade em cada página do original + páginas de evidências.
  *
  * Unidade pt: envelope_fields já está em pontos PDF topo-esquerdo, aplicação direta.
  * NUNCA usar sobre PDF já assinado digitalmente (reescreve o documento).
@@ -18,8 +19,13 @@ class EnvelopePdfComposer
     /** Arquivos temporários locais baixados do S3, para apagar ao final. */
     private array $downloadedTemps = [];
 
-    /** @return array{path: string, pages: int} */
-    public function compose(Envelope $envelope, string $evidencePdfPath): array
+    /**
+     * @return array{path: string, pages: int}
+     *
+     * $compress=false é usado só em teste, para permitir grep no PDF gerado
+     * (TCPDF comprime streams de texto por padrão via FlateDecode).
+     */
+    public function compose(Envelope $envelope, string $evidencePdfPath, bool $compress = true): array
     {
         $disk = Storage::disk('documents');
 
@@ -28,8 +34,9 @@ class EnvelopePdfComposer
             $pdf->setPrintHeader(false);
             $pdf->setPrintFooter(false);
             $pdf->SetAutoPageBreak(false);
+            $pdf->SetCompression($compress);
 
-            // 1. Páginas do original, carimbando as assinaturas de cada uma
+            // 1. Páginas do original, carimbando as assinaturas de cada uma + rodapé
             $fieldsByPage = $this->fieldsByPage($envelope);
             $originalLocal = $this->downloadToTemp($disk, $envelope->original_pdf_path);
             $pageCount = $pdf->setSourceFile($originalLocal);
@@ -44,9 +51,11 @@ class EnvelopePdfComposer
                     $signatureLocal = $this->downloadToTemp($disk, $field->signer->signature_image_path);
                     $pdf->Image($signatureLocal, $field->x, $field->y, $field->w, $field->h, 'PNG');
                 }
+
+                $this->stampFooter($pdf, $envelope->verification_code);
             }
 
-            // 2. Páginas de evidências ao final
+            // 2. Páginas de evidências ao final (já têm seu próprio rodapé, sem o carimbo aqui)
             $evidenceCount = $pdf->setSourceFile($evidencePdfPath);
             for ($page = 1; $page <= $evidenceCount; $page++) {
                 $tpl = $pdf->importPage($page);
@@ -65,6 +74,22 @@ class EnvelopePdfComposer
             }
             $this->downloadedTemps = [];
         }
+    }
+
+    /** Faixa fina no rodapé da página com o código de verificação público. */
+    private function stampFooter(Fpdi $pdf, string $verificationCode): void
+    {
+        $url = rtrim(config('app.url'), '/')."/verificar/{$verificationCode}";
+        $pageHeight = $pdf->getPageHeight();
+        $pageWidth = $pdf->getPageWidth();
+
+        $pdf->SetFont('helvetica', '', 6.5);
+        $pdf->SetTextColor(153, 153, 153);
+        $pdf->SetXY(20, $pageHeight - 22);
+        $pdf->Cell($pageWidth - 40, 10,
+            "Código do documento {$verificationCode} · assinado eletronicamente · Verifique em {$url}",
+            0, 0, 'C');
+        $pdf->SetTextColor(0, 0, 0);
     }
 
     /** Baixa um arquivo do disk documents para um temporário local; TCPDF/FPDI exigem path real. */
