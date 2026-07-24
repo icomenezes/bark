@@ -94,4 +94,9 @@ Route::prefix('sign/{token}')->name('public.sign.')->group(function () {
     Route::post('decline', [SignEnvelopeController::class, 'decline'])->middleware('throttle:10,1')->name('decline');
 });
 
+// Verificação pública de documentos assinados (envelopes e assinatura avulsa)
+Route::get('/verificar/{code}', [\App\Http\Controllers\PublicVerificationController::class, 'show'])
+    ->middleware('throttle:30,1')
+    ->name('public.verification.show');
+
 require __DIR__.'/auth.php';
