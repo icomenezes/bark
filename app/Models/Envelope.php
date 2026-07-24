@@ -13,6 +13,7 @@ class Envelope extends Model
 
     protected $fillable = [
         'user_id', 'title', 'message',
+        'verification_code',
         'original_pdf_path', 'final_pdf_path',
         'sha256_original', 'sha256_final',
         'signing_order', 'status', 'expires_at', 'completed_at',
