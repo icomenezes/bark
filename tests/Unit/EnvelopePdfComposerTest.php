@@ -64,6 +64,24 @@ class EnvelopePdfComposerTest extends TestCase
         @unlink($evidence);
     }
 
+    public function test_download_to_temp_preserves_byte_integrity(): void
+    {
+        Storage::fake('documents');
+
+        $source = $this->makeSourcePdf(5);
+        Storage::disk('documents')->put('envelopes/integrity/original.pdf', file_get_contents($source));
+
+        $composer = new EnvelopePdfComposer;
+        $method = new \ReflectionMethod($composer, 'downloadToTemp');
+        $method->setAccessible(true);
+        $temp = $method->invoke($composer, Storage::disk('documents'), 'envelopes/integrity/original.pdf');
+
+        $this->assertSame(hash_file('sha256', $source), hash_file('sha256', $temp));
+
+        @unlink($source);
+        @unlink($temp);
+    }
+
     public function test_stamps_verification_footer_on_every_original_page(): void
     {
         Storage::fake('documents');

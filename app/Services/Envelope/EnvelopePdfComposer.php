@@ -92,13 +92,22 @@ class EnvelopePdfComposer
         $pdf->SetTextColor(0, 0, 0);
     }
 
-    /** Baixa um arquivo do disk documents para um temporário local; TCPDF/FPDI exigem path real. */
+    /**
+     * Baixa um arquivo do disk documents para um temporário local; TCPDF/FPDI exigem path real.
+     *
+     * stream_copy_to_stream() (não file_put_contents com resource) é o idiom correto para
+     * copiar um stream HTTP remoto (GetObject do S3, chunked/não-seekable) até EOF: evita
+     * leitura parcial que corrompe o PDF (xref no final do arquivo fica truncado), reproduzível
+     * só contra S3 real — Storage::fake() em teste usa disk local e não expõe o problema.
+     */
     private function downloadToTemp($disk, string $path): string
     {
         $temp = tempnam(sys_get_temp_dir(), 'dl_').'_'.basename($path);
-        $stream = $disk->readStream($path);
-        file_put_contents($temp, $stream, FILE_BINARY);
-        fclose($stream);
+        $source = $disk->readStream($path);
+        $dest = fopen($temp, 'wb');
+        stream_copy_to_stream($source, $dest);
+        fclose($source);
+        fclose($dest);
         $this->downloadedTemps[] = $temp;
 
         return $temp;
