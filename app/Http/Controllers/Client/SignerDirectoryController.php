@@ -28,6 +28,13 @@ class SignerDirectoryController extends Controller
         return back()->with('success', 'Signatário salvo.');
     }
 
+    public function edit(SavedSigner $savedSigner)
+    {
+        $this->authorizeOwner($savedSigner);
+
+        return view('client.signers.edit', ['savedSigner' => $savedSigner]);
+    }
+
     public function update(Request $request, SavedSigner $savedSigner)
     {
         $this->authorizeOwner($savedSigner);
@@ -62,6 +69,14 @@ class SignerDirectoryController extends Controller
         $this->directory->createGroup(auth()->user(), $request->input('name'), $request->input('members', []));
 
         return back()->with('success', 'Grupo criado.');
+    }
+
+    public function editGroup(SignerGroup $signerGroup)
+    {
+        $this->authorizeOwnerGroup($signerGroup);
+        $signers = auth()->user()->savedSigners()->orderBy('name')->get();
+
+        return view('client.signers.edit-group', ['signerGroup' => $signerGroup, 'signers' => $signers]);
     }
 
     public function updateGroup(Request $request, SignerGroup $signerGroup)

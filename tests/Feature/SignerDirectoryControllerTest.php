@@ -78,4 +78,42 @@ class SignerDirectoryControllerTest extends TestCase
         $this->assertNotNull($group);
         $this->assertCount(1, $group->members);
     }
+
+    public function test_edit_signer_shows_owned_signer(): void
+    {
+        $user = User::factory()->create(['role' => 'client']);
+        $signer = SavedSigner::factory()->create(['user_id' => $user->id, 'name' => 'Bruna Lima']);
+
+        $this->actingAs($user)->get("/signatarios/{$signer->id}/editar")
+            ->assertOk()->assertSee('Bruna Lima');
+    }
+
+    public function test_cannot_edit_another_users_signer(): void
+    {
+        $user = User::factory()->create(['role' => 'client']);
+        $other = User::factory()->create(['role' => 'client']);
+        $signer = SavedSigner::factory()->create(['user_id' => $other->id]);
+
+        $this->actingAs($user)->get("/signatarios/{$signer->id}/editar")->assertForbidden();
+    }
+
+    public function test_edit_group_shows_owned_group_with_members_selected(): void
+    {
+        $user = User::factory()->create(['role' => 'client']);
+        $signer = SavedSigner::factory()->create(['user_id' => $user->id, 'name' => 'Carlos Souza']);
+        $group = SignerGroup::factory()->create(['user_id' => $user->id, 'name' => 'Diretoria']);
+        $group->members()->sync([$signer->id]);
+
+        $this->actingAs($user)->get("/signatarios/grupos/{$group->id}/editar")
+            ->assertOk()->assertSee('Diretoria')->assertSee('Carlos Souza');
+    }
+
+    public function test_cannot_edit_another_users_group(): void
+    {
+        $user = User::factory()->create(['role' => 'client']);
+        $other = User::factory()->create(['role' => 'client']);
+        $group = SignerGroup::factory()->create(['user_id' => $other->id]);
+
+        $this->actingAs($user)->get("/signatarios/grupos/{$group->id}/editar")->assertForbidden();
+    }
 }

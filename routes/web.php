@@ -67,9 +67,11 @@ Route::middleware('auth')->group(function () {
     Route::get('signatarios', [\App\Http\Controllers\Client\SignerDirectoryController::class, 'index'])->name('signers.index');
     Route::post('signatarios', [\App\Http\Controllers\Client\SignerDirectoryController::class, 'store'])->name('signers.store');
     Route::get('signatarios/buscar', [\App\Http\Controllers\Client\SignerDirectoryController::class, 'search'])->name('signers.search');
+    Route::get('signatarios/{savedSigner}/editar', [\App\Http\Controllers\Client\SignerDirectoryController::class, 'edit'])->name('signers.edit');
     Route::patch('signatarios/{savedSigner}', [\App\Http\Controllers\Client\SignerDirectoryController::class, 'update'])->name('signers.update');
     Route::delete('signatarios/{savedSigner}', [\App\Http\Controllers\Client\SignerDirectoryController::class, 'destroy'])->name('signers.destroy');
     Route::post('signatarios/grupos', [\App\Http\Controllers\Client\SignerDirectoryController::class, 'storeGroup'])->name('signers.groups.store');
+    Route::get('signatarios/grupos/{signerGroup}/editar', [\App\Http\Controllers\Client\SignerDirectoryController::class, 'editGroup'])->name('signers.groups.edit');
     Route::patch('signatarios/grupos/{signerGroup}', [\App\Http\Controllers\Client\SignerDirectoryController::class, 'updateGroup'])->name('signers.groups.update');
     Route::delete('signatarios/grupos/{signerGroup}', [\App\Http\Controllers\Client\SignerDirectoryController::class, 'destroyGroup'])->name('signers.groups.destroy');
 });
