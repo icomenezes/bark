@@ -249,4 +249,57 @@ class EnvelopeControllerTest extends TestCase
         $this->actingAs($user)->get('/envelopes/create')
             ->assertOk()->assertSee('Diretoria');
     }
+
+    public function test_store_saves_signer_marked_to_save_as_contact(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        Mail::fake();
+        $this->configurePlatformCertificate();
+        $user = User::factory()->withPlan()->create(['role' => 'client']);
+
+        $payload = array_merge($this->validPayload(), ['signers_json' => json_encode([
+            ['name' => 'Nova Ana', 'email' => 'nova.ana@x.com', 'channel' => 'email', 'auth_method' => 'link',
+             'save_as_contact' => true,
+             'fields' => [['page' => 1, 'x' => 1, 'y' => 1, 'w' => 50, 'h' => 20]]],
+        ])]);
+
+        $this->actingAs($user)->post('/envelopes', $payload);
+
+        $this->assertDatabaseHas('saved_signers', ['user_id' => $user->id, 'name' => 'Nova Ana', 'email' => 'nova.ana@x.com']);
+    }
+
+    public function test_store_does_not_duplicate_signer_when_not_marked_to_save(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        Mail::fake();
+        $this->configurePlatformCertificate();
+        $user = User::factory()->withPlan()->create(['role' => 'client']);
+
+        $this->actingAs($user)->post('/envelopes', $this->validPayload());
+
+        $this->assertDatabaseCount('saved_signers', 0);
+    }
+
+    public function test_store_records_saved_signer_id_when_signer_came_from_a_contact(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        Mail::fake();
+        $this->configurePlatformCertificate();
+        $user = User::factory()->withPlan()->create(['role' => 'client']);
+        $contact = \App\Models\SavedSigner::factory()->create(['user_id' => $user->id, 'name' => 'Contato Existente', 'email' => 'contato@x.com']);
+
+        $payload = array_merge($this->validPayload(), ['signers_json' => json_encode([
+            ['name' => 'Contato Existente', 'email' => 'contato@x.com', 'channel' => 'email', 'auth_method' => 'link',
+             'saved_signer_id' => $contact->id,
+             'fields' => [['page' => 1, 'x' => 1, 'y' => 1, 'w' => 50, 'h' => 20]]],
+        ])]);
+
+        $this->actingAs($user)->post('/envelopes', $payload);
+
+        $envelope = Envelope::first();
+        $this->assertSame($contact->id, $envelope->signers->first()->saved_signer_id);
+    }
 }

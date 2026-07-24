@@ -51,6 +51,7 @@ class EnvelopeService
                     'auth_method' => $s['auth_method'],
                     'sign_position' => $i + 1,
                     'send_signed_copy' => $s['send_signed_copy'] ?? true,
+                    'saved_signer_id' => $s['saved_signer_id'] ?? null,
                 ]);
                 $signer->fields()->createMany($s['fields']);
             }

@@ -19,6 +19,7 @@ class EnvelopeController extends Controller
         private EnvelopeService $envelopes,
         private AccessLogService $accessLog,
         private UsageLimitService $usageLimit,
+        private \App\Services\SignerDirectoryService $signerDirectory,
     ) {}
 
     public function index()
@@ -68,7 +69,7 @@ class EnvelopeController extends Controller
             'signers_json' => ['required', 'string'],
         ]);
 
-        $signers = $this->validateSigners($request->input('signers_json'));
+        $signers = $this->validateSigners($request->input('signers_json'), auth()->user());
 
         try {
             $envelope = $this->envelopes->create(auth()->user(), $request->file('pdf'), [
@@ -83,6 +84,8 @@ class EnvelopeController extends Controller
         } catch (\RuntimeException $e) {
             return back()->with('error', $e->getMessage())->withInput();
         }
+
+        $this->persistSignersMarkedToSave(auth()->user(), $signers);
 
         $this->accessLog->log(auth()->user(), 'envelope_created', [
             'envelope_id' => $envelope->id, 'title' => $envelope->title,
@@ -178,7 +181,7 @@ class EnvelopeController extends Controller
     }
 
     /** Valida o payload de signatários montado pelo wizard. */
-    private function validateSigners(string $json): array
+    private function validateSigners(string $json, \App\Models\User $user): array
     {
         $signers = json_decode($json, true);
 
@@ -189,6 +192,8 @@ class EnvelopeController extends Controller
             'signers.*.email' => ['nullable', 'email', 'max:255', 'required_if:signers.*.channel,email'],
             'signers.*.whatsapp' => ['nullable', 'string', 'max:20', 'required_if:signers.*.channel,whatsapp'],
             'signers.*.auth_method' => ['required', 'in:link,email_otp,whatsapp_otp'],
+            'signers.*.saved_signer_id' => ['nullable', 'integer'],
+            'signers.*.save_as_contact' => ['nullable', 'boolean'],
             'signers.*.fields' => ['required', 'array', 'min:1'],
             'signers.*.fields.*.page' => ['required', 'integer', 'min:1'],
             'signers.*.fields.*.x' => ['required', 'numeric', 'min:0'],
@@ -212,6 +217,38 @@ class EnvelopeController extends Controller
             }
         }
 
+        // IDOR: saved_signer_id vem do wizard (cliente) — nunca confiar sem checar posse,
+        // senão um usuário poderia referenciar o contato salvo de outro cliente.
+        $ownedIds = $user->savedSigners()->pluck('id')->all();
+        foreach ($signers as &$signer) {
+            if (! empty($signer['saved_signer_id']) && ! in_array($signer['saved_signer_id'], $ownedIds, true)) {
+                $signer['saved_signer_id'] = null;
+            }
+        }
+        unset($signer);
+
         return $signers;
+    }
+
+    /** Cria um SavedSigner para cada linha marcada, ignorando as que já vieram de um contato existente. */
+    private function persistSignersMarkedToSave(\App\Models\User $user, array $signers): void
+    {
+        foreach ($signers as $signer) {
+            if (empty($signer['save_as_contact']) || ! empty($signer['saved_signer_id'])) {
+                continue;
+            }
+
+            try {
+                $this->signerDirectory->createSigner($user, [
+                    'name' => $signer['name'],
+                    'channel' => $signer['channel'],
+                    'email' => $signer['email'] ?? null,
+                    'whatsapp' => $signer['whatsapp'] ?? null,
+                    'auth_method' => $signer['auth_method'],
+                ]);
+            } catch (ValidationException) {
+                // limite de 100 contatos atingido, ou dados incompatíveis — não bloqueia o envio do envelope
+            }
+        }
     }
 }
