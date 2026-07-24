@@ -46,7 +46,7 @@ $statusColors = ['draft' => 'bg-gray-100 text-gray-700', 'sent' => 'bg-blue-100 
                             <tr class="hover:bg-gray-800/50 transition-colors">
                                 <td class="px-4 py-3 text-white">{{ $envelope->title }}</td>
                                 <td class="px-4 py-3">
-                                    <span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium {{ $statusColors[$envelope->status] ?? 'bg-gray-100 text-gray-700' }}">
+                                    <span class="inline-block px-2 py-0.5 rounded-md text-xs font-medium {{ $statusColors[$envelope->status] ?? 'bg-gray-100 text-gray-700' }}">
                                         {{ $statusLabels[$envelope->status] ?? $envelope->status }}
                                     </span>
                                 </td>

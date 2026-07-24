@@ -87,7 +87,7 @@
 
         <div class="px-3 py-4 border-t border-gray-800">
             <div class="flex items-center gap-3 px-3 py-2">
-                <div class="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center text-xs font-bold text-white">
+                <div class="w-8 h-8 bg-gray-700 rounded-md flex items-center justify-center text-xs font-bold text-white">
                     {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
                 </div>
                 <div class="flex-1 min-w-0">

@@ -21,7 +21,7 @@
     <div class="flex items-center gap-2 text-xs">
         <template x-for="(label, i) in ['Documento', 'Signatários', 'Posicionar assinaturas']" :key="i">
             <div class="flex items-center gap-2">
-                <span class="w-6 h-6 rounded-full flex items-center justify-center font-semibold"
+                <span class="w-6 h-6 rounded-md flex items-center justify-center font-semibold"
                       :class="step === i + 1 ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400'"
                       x-text="i + 1"></span>
                 <span :class="step === i + 1 ? 'text-white' : 'text-gray-500'" x-text="label"></span>
@@ -144,7 +144,7 @@
                 <span class="text-sm text-gray-400">Clique numa página para posicionar a assinatura de:</span>
                 <template x-for="(signer, i) in signers" :key="i">
                     <button type="button" @click="selected = i"
-                            class="px-3 py-1 rounded-full text-xs font-semibold border-2 transition-colors"
+                            class="px-3 py-1 rounded-md text-xs font-semibold border-2 transition-colors"
                             :style="`border-color:${colors[i % 8]}; color:${selected === i ? '#fff' : colors[i % 8]}; background:${selected === i ? colors[i % 8] : 'transparent'}`"
                             x-text="signer.name || `Signatário ${i + 1}`"></button>
                 </template>

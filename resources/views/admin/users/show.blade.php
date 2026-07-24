@@ -12,7 +12,7 @@
 
     {{-- Perfil + Status --}}
     <div class="bg-gray-900 rounded-lg border border-gray-800 p-5 flex items-center gap-4">
-        <div class="w-12 h-12 bg-gray-700 rounded-full flex items-center justify-center text-lg font-bold text-white">
+        <div class="w-12 h-12 bg-gray-700 rounded-md flex items-center justify-center text-lg font-bold text-white">
             {{ strtoupper(substr($user->name, 0, 1)) }}
         </div>
         <div>
@@ -24,14 +24,14 @@
         </div>
         <div class="ml-auto flex items-center gap-2">
             @if($user->isOnline())
-                <span class="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-green-900/40 text-green-400 border border-green-800">
-                    <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span> Online
+                <span class="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs bg-green-900/40 text-green-400 border border-green-800">
+                    <span class="w-1.5 h-1.5 rounded-md bg-green-400 animate-pulse"></span> Online
                 </span>
             @endif
             @if($user->isAdmin())
-                <span class="px-2.5 py-1 rounded-full text-xs bg-blue-900/40 text-blue-400 border border-blue-800">Admin</span>
+                <span class="px-2.5 py-1 rounded-md text-xs bg-blue-900/40 text-blue-400 border border-blue-800">Admin</span>
             @else
-                <span class="px-2.5 py-1 rounded-full text-xs bg-gray-800 text-gray-400 border border-gray-700">Cliente</span>
+                <span class="px-2.5 py-1 rounded-md text-xs bg-gray-800 text-gray-400 border border-gray-700">Cliente</span>
             @endif
         </div>
     </div>
@@ -74,7 +74,7 @@
         <div class="divide-y divide-gray-800">
             @foreach($recentLogs as $log)
             <div class="flex items-center gap-3 px-6 py-2.5">
-                <span class="w-2 h-2 rounded-full bg-{{ $log->eventColor() }}-500 shrink-0"></span>
+                <span class="w-2 h-2 rounded-md bg-{{ $log->eventColor() }}-500 shrink-0"></span>
                 <span class="text-xs text-gray-300 flex-1">{{ $log->eventLabel() }}</span>
                 <span class="text-xs text-gray-600">{{ $log->created_at->format('d/m H:i') }}</span>
                 <span class="text-xs text-gray-700">{{ $log->ip_address }}</span>

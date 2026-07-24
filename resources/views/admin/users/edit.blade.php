@@ -111,7 +111,7 @@
         @if ($hasApiToken)
             <div class="flex items-center justify-between mb-4">
                 <span class="inline-flex items-center gap-1.5 text-xs text-green-400">
-                    <span class="w-1.5 h-1.5 rounded-full bg-green-400"></span> Token ativo
+                    <span class="w-1.5 h-1.5 rounded-md bg-green-400"></span> Token ativo
                 </span>
                 <form method="POST" action="{{ route('admin.users.api-token.revoke', $user) }}"
                       onsubmit="return confirm('Revogar o token de API deste usuário?')">

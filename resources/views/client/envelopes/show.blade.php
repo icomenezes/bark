@@ -23,7 +23,7 @@ $channelLabels = ['email' => 'E-mail', 'whatsapp' => 'WhatsApp'];
         <div>
             <div class="flex items-center gap-3">
                 <h1 class="text-xl font-semibold text-white">{{ $envelope->title }}</h1>
-                <span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium {{ $statusColors[$envelope->status] ?? '' }}">
+                <span class="inline-block px-2 py-0.5 rounded-md text-xs font-medium {{ $statusColors[$envelope->status] ?? '' }}">
                     {{ $statusLabels[$envelope->status] ?? $envelope->status }}
                 </span>
             </div>
@@ -84,7 +84,7 @@ $channelLabels = ['email' => 'E-mail', 'whatsapp' => 'WhatsApp'];
             <div class="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-1">
                 <div class="flex items-center justify-between">
                     <p class="text-white font-medium">{{ $signer->sign_position }}. {{ $signer->name }}</p>
-                    <span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium {{ $signerColors[$signer->status] ?? '' }}">
+                    <span class="inline-block px-2 py-0.5 rounded-md text-xs font-medium {{ $signerColors[$signer->status] ?? '' }}">
                         {{ $signerLabels[$signer->status] ?? $signer->status }}
                     </span>
                 </div>

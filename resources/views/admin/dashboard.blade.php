@@ -62,14 +62,14 @@
         {{-- Online agora --}}
         <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
             <div class="px-5 py-4 border-b border-gray-800 flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+                <span class="w-2 h-2 rounded-md bg-green-400 animate-pulse"></span>
                 <h3 class="text-sm font-semibold text-white">Online agora</h3>
                 <span class="ml-auto text-xs text-gray-500">{{ $onlineNow->count() }} usuário{{ $onlineNow->count() !== 1 ? 's' : '' }}</span>
             </div>
             <div class="divide-y divide-gray-800">
                 @forelse($onlineNow as $session)
                 <div class="flex items-center gap-3 px-5 py-3">
-                    <div class="w-7 h-7 bg-gray-700 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0">
+                    <div class="w-7 h-7 bg-gray-700 rounded-md flex items-center justify-center text-xs font-bold text-white shrink-0">
                         {{ strtoupper(substr($session->user->name, 0, 1)) }}
                     </div>
                     <div class="flex-1 min-w-0">
@@ -98,7 +98,7 @@
             <div class="divide-y divide-gray-800">
                 @forelse($recentUsers as $recentUser)
                 <div class="flex items-center gap-3 px-5 py-3">
-                    <div class="w-7 h-7 bg-gray-700 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0">
+                    <div class="w-7 h-7 bg-gray-700 rounded-md flex items-center justify-center text-xs font-bold text-white shrink-0">
                         {{ strtoupper(substr($recentUser->name, 0, 1)) }}
                     </div>
                     <div class="flex-1 min-w-0">
@@ -124,7 +124,7 @@
         <div class="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
             <h3 class="text-sm font-semibold text-white">Atividade recente</h3>
             @if($deniedToday > 0)
-            <span class="px-2.5 py-1 rounded-full text-xs bg-red-900/40 text-red-400 border border-red-800">
+            <span class="px-2.5 py-1 rounded-md text-xs bg-red-900/40 text-red-400 border border-red-800">
                 {{ $deniedToday }} acesso{{ $deniedToday > 1 ? 's' : '' }} negado{{ $deniedToday > 1 ? 's' : '' }} hoje
             </span>
             @endif
@@ -133,7 +133,7 @@
         <div class="divide-y divide-gray-800">
             @foreach($recentLogs as $log)
             <div class="flex items-center gap-3 px-5 py-2.5">
-                <span class="w-1.5 h-1.5 rounded-full bg-{{ $log->eventColor() }}-500 shrink-0"></span>
+                <span class="w-1.5 h-1.5 rounded-md bg-{{ $log->eventColor() }}-500 shrink-0"></span>
                 <span class="text-xs text-gray-300 flex-1">
                     <span class="text-white">{{ $log->user->name }}</span>
                     — {{ $log->eventLabel() }}

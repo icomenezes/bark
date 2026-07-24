@@ -28,7 +28,7 @@
             <tr class="hover:bg-gray-800/50 transition-colors">
                 <td class="px-6 py-4">
                     <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
+                        <div class="w-8 h-8 bg-gray-700 rounded-md flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
                             {{ strtoupper(substr($user->name, 0, 1)) }}
                         </div>
                         <a href="{{ route('admin.users.show', $user) }}" class="font-medium text-white hover:text-blue-400 transition-colors">
@@ -39,15 +39,15 @@
                 <td class="px-6 py-4 text-gray-400">{{ $user->email }}</td>
                 <td class="px-6 py-4">
                     @if($user->isAdmin())
-                        <span class="px-2.5 py-1 rounded-full text-xs bg-blue-900/40 text-blue-400 border border-blue-800">Admin</span>
+                        <span class="px-2.5 py-1 rounded-md text-xs bg-blue-900/40 text-blue-400 border border-blue-800">Admin</span>
                     @else
-                        <span class="px-2.5 py-1 rounded-full text-xs bg-gray-800 text-gray-400 border border-gray-700">Cliente</span>
+                        <span class="px-2.5 py-1 rounded-md text-xs bg-gray-800 text-gray-400 border border-gray-700">Cliente</span>
                     @endif
                 </td>
                 <td class="px-6 py-4">
                     @if($user->isOnline())
                         <span class="inline-flex items-center gap-1.5 text-xs text-green-400">
-                            <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span> Online
+                            <span class="w-1.5 h-1.5 rounded-md bg-green-400 animate-pulse"></span> Online
                         </span>
                     @else
                         <span class="text-xs text-gray-500">Offline</span>
