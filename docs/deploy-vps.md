@@ -27,6 +27,12 @@ Runbook do ambiente de produção. Registrado em 2026-07-15, durante a subida do
 cd /var/www/assinador
 git pull
 
+# dependencias PHP — sempre que o composer.lock mudou no pull
+# COMPOSER_HOME é obrigatório: o www-data não tem home gravável
+sudo -u www-data COMPOSER_HOME=/tmp/composer composer install --no-dev --optimize-autoloader
+# checar antes, sem escrever nada: acrescentar --dry-run
+# ("Nothing to install, update or remove" = já está em sincronia)
+
 # migrations novas (se houver)
 sudo -u www-data /usr/bin/php8.3 artisan migrate --force
 
@@ -36,7 +42,11 @@ sudo -u www-data /usr/bin/php8.3 artisan route:clear
 sudo -u www-data /usr/bin/php8.3 artisan view:clear
 
 # assets — só se mudou CSS/JS ou blade com classes Tailwind novas
+# "classes novas" inclui cor inédita na paleta (bg-amber-*, text-teal-*) e
+# variante inédita (lg:grid-cols-4): o Tailwind só gera o que encontra nos
+# arquivos, então sem rebuild o card novo renderiza sem cor nenhuma
 npm ci && npm run build
+# conferir que a classe entrou: grep -c amber-400 public/build/assets/app-*.css
 
 # OBRIGATÓRIO se mudou qualquer código usado por jobs (lacre, mails):
 # o worker roda o código que estava na memória até ser reiniciado
