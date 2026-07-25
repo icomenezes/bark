@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\AccessLog;
 use App\Models\ActiveSession;
 use App\Models\User;
+use App\Services\DashboardStatsService;
 
 class DashboardController extends Controller
 {
+    public function __construct(private DashboardStatsService $stats) {}
+
     public function index()
     {
         // Usuários
@@ -36,8 +39,10 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
+        $stats = $this->stats->admin();
+
         return view('admin.dashboard', compact(
-            'clientsTotal', 'onlineNow', 'deniedToday', 'recentLogs', 'recentUsers'
+            'clientsTotal', 'onlineNow', 'deniedToday', 'recentLogs', 'recentUsers', 'stats'
         ));
     }
 }

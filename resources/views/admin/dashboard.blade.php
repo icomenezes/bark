@@ -54,6 +54,48 @@
             <p class="text-xs text-gray-500 mt-1">hoje</p>
         </div>
 
+        {{-- Envelopes enviados --}}
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Envelopes enviados</span>
+                <div class="w-8 h-8 bg-blue-900/50 rounded-lg flex items-center justify-center">
+                    <svg class="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                              d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
+                </div>
+            </div>
+            <p class="text-3xl font-bold text-white">{{ $stats['envelopes_sent'] }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ $stats['envelopes_sent_month'] }} este mês</p>
+        </div>
+
+        {{-- Envelopes concluídos --}}
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Envelopes concluídos</span>
+                <div class="w-8 h-8 bg-green-900/50 rounded-lg flex items-center justify-center">
+                    <svg class="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+            </div>
+            <p class="text-3xl font-bold text-white">{{ $stats['envelopes_completed'] }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ $stats['envelopes_completed_month'] }} este mês</p>
+        </div>
+
+        {{-- Assinaturas avulsas --}}
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Assinaturas avulsas</span>
+                <div class="w-8 h-8 bg-amber-900/50 rounded-lg flex items-center justify-center">
+                    <x-signature-icon class="w-4 h-4 text-amber-400" />
+                </div>
+            </div>
+            <p class="text-3xl font-bold text-white">{{ $stats['signatures'] }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ $stats['signatures_month'] }} este mês</p>
+        </div>
+
     </div>
 
     {{-- Online agora + Últimos cadastros --}}
@@ -138,7 +180,7 @@
                     <span class="text-white">{{ $log->user->name }}</span>
                     — {{ $log->eventLabel() }}
                 </span>
-                <span class="text-xs text-gray-600 shrink-0">{{ $log->created_at->format('H:i') }}</span>
+                <span class="text-xs text-gray-600 shrink-0">{{ $log->created_at->format('d/m/Y H:i') }}</span>
             </div>
             @endforeach
         </div>
