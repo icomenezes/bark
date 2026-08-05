@@ -57,6 +57,7 @@ Payload JSON:
   "signer_email": "joao@example.com",
   "signer_whatsapp": "11999998888",
   "send_signed_copy": true,
+  "field": {"page": 1, "x": 350, "y": 750, "w": 150, "h": 50},
   "pdf_base64": "JVBERi0xLjQK..."
 }
 ```
@@ -78,6 +79,11 @@ Regras:
   assinado só em sua posse (ex.: promissórias assinadas por clientes via API).
   O e-mail de conclusão ao dono do envelope (remetente) nunca é afetado por
   este campo. Persistido em `envelope_signers.send_signed_copy`
+- `field`: opcional (adicionado em 2026-08-05), objeto com a posição da assinatura
+  em pontos PDF, origem topo-esquerdo — mesmo formato da API de assinatura avulsa.
+  Sub-campos todos opcionais: `page` (inteiro ≥ 1, limitado ao total de páginas do
+  PDF), `x`/`y` (numérico ≥ 0), `w`/`h` (numérico ≥ 1). Ausentes caem no default:
+  última página, canto inferior direito (`x = 350, y = 750, w = 150, h = 50`)
 - `pdf_base64`: obrigatório, string base64 que decodifica para um PDF válido
   (assinatura `%PDF-` nos primeiros bytes), tamanho decodificado até 15 MB (mesmo
   limite do upload web)
@@ -86,9 +92,6 @@ Sempre, sem parâmetro para mudar:
 - Único signatário, `sign_position = 1`
 - `auth_method = 'link'` (sem OTP)
 - `signing_order = 'parallel'` (irrelevante com 1 signatário)
-- Posição de assinatura fixa: última página do PDF, canto inferior direito
-  (`page = última página, x = 350, y = 750, w = 150, h = 50` — mesmos pontos PDF,
-  origem topo-esquerdo, usados no restante do sistema)
 - `expires_at = null` (sem expiração automática — mesma regra do formulário quando
   o campo é deixado em branco)
 

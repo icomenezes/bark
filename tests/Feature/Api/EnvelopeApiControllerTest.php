@@ -238,6 +238,87 @@ class EnvelopeApiControllerTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_field_defaults_to_last_page_bottom_right_when_omitted(): void
+    {
+        Storage::fake('documents');
+        Mail::fake();
+        $this->configurePlatformCertificate();
+        $user = $this->userWithPlan();
+        $token = $user->createToken('api')->plainTextToken;
+
+        $payload = array_merge($this->validPayload(), ['pdf_base64' => $this->makeSourcePdfBase64(pages: 3)]);
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/v1/envelopes', $payload)
+            ->assertCreated();
+
+        $field = Envelope::first()->signers->first()->fields->first();
+        $this->assertSame(3, $field->page);
+        $this->assertEqualsWithDelta(350, $field->x, 0.01);
+        $this->assertEqualsWithDelta(750, $field->y, 0.01);
+        $this->assertEqualsWithDelta(150, $field->w, 0.01);
+        $this->assertEqualsWithDelta(50, $field->h, 0.01);
+    }
+
+    public function test_custom_field_position_is_persisted(): void
+    {
+        Storage::fake('documents');
+        Mail::fake();
+        $this->configurePlatformCertificate();
+        $user = $this->userWithPlan();
+        $token = $user->createToken('api')->plainTextToken;
+
+        $payload = array_merge($this->validPayload(), [
+            'pdf_base64' => $this->makeSourcePdfBase64(pages: 2),
+            'field' => ['page' => 1, 'x' => 100, 'y' => 200, 'w' => 180, 'h' => 60],
+        ]);
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/v1/envelopes', $payload)
+            ->assertCreated();
+
+        $field = Envelope::first()->signers->first()->fields->first();
+        $this->assertSame(1, $field->page);
+        $this->assertEqualsWithDelta(100, $field->x, 0.01);
+        $this->assertEqualsWithDelta(200, $field->y, 0.01);
+        $this->assertEqualsWithDelta(180, $field->w, 0.01);
+        $this->assertEqualsWithDelta(60, $field->h, 0.01);
+    }
+
+    public function test_field_page_is_clamped_to_document_page_count(): void
+    {
+        Storage::fake('documents');
+        Mail::fake();
+        $this->configurePlatformCertificate();
+        $user = $this->userWithPlan();
+        $token = $user->createToken('api')->plainTextToken;
+
+        $payload = array_merge($this->validPayload(), [
+            'field' => ['page' => 99],
+        ]);
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/v1/envelopes', $payload)
+            ->assertCreated();
+
+        $this->assertSame(1, Envelope::first()->signers->first()->fields->first()->page);
+    }
+
+    public function test_rejects_invalid_field_values(): void
+    {
+        $user = $this->userWithPlan();
+        $token = $user->createToken('api')->plainTextToken;
+
+        $payload = array_merge($this->validPayload(), [
+            'field' => ['page' => 0, 'x' => -10, 'w' => 0],
+        ]);
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/v1/envelopes', $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['field.page', 'field.x', 'field.w']);
+    }
+
     public function test_send_signed_copy_defaults_to_true(): void
     {
         Storage::fake('documents');

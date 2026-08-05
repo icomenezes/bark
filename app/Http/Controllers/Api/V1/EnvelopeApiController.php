@@ -45,6 +45,12 @@ class EnvelopeApiController extends Controller
             'signer_whatsapp' => ['nullable', 'string', 'max:20'],
             'send_signed_copy' => ['nullable', 'boolean'],
             'pdf_base64' => ['required', 'string'],
+            'field' => ['nullable', 'array'],
+            'field.page' => ['nullable', 'integer', 'min:1'],
+            'field.x' => ['nullable', 'numeric', 'min:0'],
+            'field.y' => ['nullable', 'numeric', 'min:0'],
+            'field.w' => ['nullable', 'numeric', 'min:1'],
+            'field.h' => ['nullable', 'numeric', 'min:1'],
         ]);
 
         $pdfPath = $this->decodeBase64Pdf($request->input('pdf_base64'));
@@ -66,7 +72,7 @@ class EnvelopeApiController extends Controller
                         'auth_method' => 'link',
                         'send_signed_copy' => $request->boolean('send_signed_copy', true),
                         'fields' => [
-                            ['page' => $pageCount, 'x' => 350, 'y' => 750, 'w' => 150, 'h' => 50],
+                            $this->resolvePosition($request->input('field', []), $pageCount),
                         ],
                     ],
                 ],
@@ -115,6 +121,18 @@ class EnvelopeApiController extends Controller
         return $disk->temporaryUrl($envelope->final_pdf_path, now()->addMinutes(5), [
             'ResponseContentDisposition' => 'attachment; filename="'.$envelope->title.' (assinado).pdf"',
         ]);
+    }
+
+    /** @return array{page:int,x:float,y:float,w:float,h:float} */
+    private function resolvePosition(array $field, int $pageCount): array
+    {
+        return [
+            'page' => min($pageCount, max(1, (int) ($field['page'] ?? $pageCount))),
+            'x' => (float) ($field['x'] ?? 350),
+            'y' => (float) ($field['y'] ?? 750),
+            'w' => (float) ($field['w'] ?? 150),
+            'h' => (float) ($field['h'] ?? 50),
+        ];
     }
 
     /** Decodifica o base64 recebido, valida que é um PDF de verdade, e grava em arquivo temporário. */
