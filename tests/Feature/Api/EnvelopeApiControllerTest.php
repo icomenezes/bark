@@ -2,12 +2,14 @@
 
 namespace Tests\Feature\Api;
 
+use App\Mail\Envelopes\EnvelopeInvite;
 use App\Models\Certificate;
 use App\Models\Envelope;
 use App\Models\Plan;
 use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -348,5 +350,183 @@ class EnvelopeApiControllerTest extends TestCase
             ->assertCreated();
 
         $this->assertFalse(Envelope::first()->signers->first()->send_signed_copy);
+    }
+
+    // ─── CPF esperado ─────────────────────────────────────────────────────────
+
+    public function test_signer_cpf_is_stored_as_expected_cpf(): void
+    {
+        Storage::fake('documents');
+        Mail::fake();
+        $this->configurePlatformCertificate();
+        $token = $this->userWithPlan()->createToken('api')->plainTextToken;
+
+        $payload = array_merge($this->validPayload(), ['signer_cpf' => '52998224725']);
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/v1/envelopes', $payload)
+            ->assertCreated();
+
+        $this->assertSame('529.982.247-25', Envelope::first()->signers->first()->expected_cpf);
+    }
+
+    public function test_invalid_signer_cpf_is_rejected(): void
+    {
+        $token = $this->userWithPlan()->createToken('api')->plainTextToken;
+
+        $payload = array_merge($this->validPayload(), ['signer_cpf' => '111.111.111-11']);
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/v1/envelopes', $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['signer_cpf']);
+    }
+
+    public function test_omitting_signer_cpf_leaves_expected_cpf_null(): void
+    {
+        Storage::fake('documents');
+        Mail::fake();
+        $this->configurePlatformCertificate();
+        $token = $this->userWithPlan()->createToken('api')->plainTextToken;
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/v1/envelopes', $this->validPayload())
+            ->assertCreated();
+
+        $this->assertNull(Envelope::first()->signers->first()->expected_cpf);
+    }
+
+    // ─── Canal e método de verificação ────────────────────────────────────────
+
+    public function test_defaults_to_email_and_link_when_channel_is_omitted(): void
+    {
+        Storage::fake('documents');
+        Mail::fake();
+        $this->configurePlatformCertificate();
+        $token = $this->userWithPlan()->createToken('api')->plainTextToken;
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/v1/envelopes', $this->validPayload())
+            ->assertCreated();
+
+        $signer = Envelope::first()->signers->first();
+        $this->assertSame('email', $signer->channel);
+        $this->assertSame('link', $signer->auth_method);
+        Mail::assertSent(EnvelopeInvite::class);
+    }
+
+    public function test_whatsapp_channel_invites_over_whatsapp(): void
+    {
+        Storage::fake('documents');
+        Mail::fake();
+        Http::fake();
+        config(['services.evolution.url' => 'https://evo.test', 'services.evolution.instance' => 'i', 'services.evolution.key' => 'k']);
+        Setting::current()->update(['whatsapp_enabled' => true]);
+        Setting::clearCache();
+        $this->configurePlatformCertificate();
+
+        $user = $this->userWithPlan();
+        $user->update(['whatsapp_envelope_enabled' => true]);
+        $token = $user->createToken('api')->plainTextToken;
+
+        $payload = array_merge($this->validPayload(), ['channel' => 'whatsapp']);
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/v1/envelopes', $payload)
+            ->assertCreated();
+
+        $this->assertSame('whatsapp', Envelope::first()->signers->first()->channel);
+        Mail::assertNothingSent();
+        Http::assertSent(
+            fn ($request) => str_contains($request->url(), '/message/sendText/')
+        );
+    }
+
+    public function test_whatsapp_channel_requires_the_account_flag(): void
+    {
+        $this->configurePlatformCertificate();
+        $user = $this->userWithPlan();
+        $user->update(['whatsapp_envelope_enabled' => false]);
+        $token = $user->createToken('api')->plainTextToken;
+
+        $payload = array_merge($this->validPayload(), ['channel' => 'whatsapp']);
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/v1/envelopes', $payload);
+
+        $response->assertUnprocessable();
+        $this->assertStringContainsString('WhatsApp', $response->json('message'));
+    }
+
+    public function test_whatsapp_channel_requires_a_number(): void
+    {
+        $user = $this->userWithPlan();
+        $user->update(['whatsapp_envelope_enabled' => true]);
+        $token = $user->createToken('api')->plainTextToken;
+
+        $payload = array_merge($this->validPayload(), ['channel' => 'whatsapp']);
+        unset($payload['signer_whatsapp']);
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/v1/envelopes', $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['signer_whatsapp']);
+    }
+
+    public function test_whatsapp_channel_does_not_require_an_email(): void
+    {
+        Storage::fake('documents');
+        Http::fake();
+        Setting::current()->update(['whatsapp_enabled' => true]);
+        Setting::clearCache();
+        $this->configurePlatformCertificate();
+
+        $user = $this->userWithPlan();
+        $user->update(['whatsapp_envelope_enabled' => true]);
+        $token = $user->createToken('api')->plainTextToken;
+
+        $payload = array_merge($this->validPayload(), ['channel' => 'whatsapp']);
+        unset($payload['signer_email']);
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/v1/envelopes', $payload)
+            ->assertCreated();
+
+        $this->assertNull(Envelope::first()->signers->first()->email);
+    }
+
+    public function test_auth_method_must_match_the_channel(): void
+    {
+        $this->configurePlatformCertificate();
+        $user = $this->userWithPlan();
+        $user->update(['whatsapp_envelope_enabled' => true]);
+        $token = $user->createToken('api')->plainTextToken;
+
+        $payload = array_merge($this->validPayload(), [
+            'channel' => 'email',
+            'auth_method' => 'whatsapp_otp',
+        ]);
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/v1/envelopes', $payload);
+
+        $response->assertUnprocessable();
+        $this->assertStringContainsString('incompatível', $response->json('message'));
+    }
+
+    public function test_email_otp_is_accepted_on_the_email_channel(): void
+    {
+        Storage::fake('documents');
+        Mail::fake();
+        $this->configurePlatformCertificate();
+        $token = $this->userWithPlan()->createToken('api')->plainTextToken;
+
+        $payload = array_merge($this->validPayload(), ['auth_method' => 'email_otp']);
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/v1/envelopes', $payload)
+            ->assertCreated();
+
+        $this->assertSame('email_otp', Envelope::first()->signers->first()->auth_method);
     }
 }

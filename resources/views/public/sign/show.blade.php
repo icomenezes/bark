@@ -114,9 +114,14 @@
         @endif
 
         <div class="border-t border-gray-800 pt-4 space-y-3">
-            <p class="text-xs text-gray-500">
-                Ao clicar em Assinar, declaro que li o documento e concordo em assinar eletronicamente.
-            </p>
+            {{-- Aceite expresso do meio eletrônico (MP 2.200-2/2001, art. 10, § 2º).
+                 A versão do texto é gravada no signatário e sai no certificado de evidências. --}}
+            <label class="flex gap-2.5 items-start cursor-pointer">
+                <input type="checkbox" name="consent" value="1" required @checked(old('consent'))
+                       class="mt-0.5 shrink-0 rounded border-gray-700 bg-gray-800 text-blue-600 focus:ring-blue-500">
+                <span class="text-xs text-gray-400 leading-relaxed">{{ $consentTerm }}</span>
+            </label>
+            @error('consent') <p class="text-red-400 text-xs">{{ $message }}</p> @enderror
             <button type="submit"
                     class="w-full sm:w-auto px-6 py-2.5 rounded text-sm font-medium text-white transition-colors"
                     style="background-color: var(--color-primary, #1e40af);">

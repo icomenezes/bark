@@ -302,4 +302,72 @@ class EnvelopeControllerTest extends TestCase
         $envelope = Envelope::first();
         $this->assertSame($contact->id, $envelope->signers->first()->saved_signer_id);
     }
+
+    // ─── Desbloqueio de CPF ───────────────────────────────────────────────────
+
+    /** @return array{0: User, 1: EnvelopeSigner} */
+    private function lockedSigner(): array
+    {
+        $user = User::factory()->withPlan()->create(['role' => 'client']);
+        $envelope = Envelope::factory()->create(['user_id' => $user->id, 'status' => 'sent']);
+        $signer = EnvelopeSigner::factory()->for($envelope)->create(['expected_cpf' => '529.982.247-25']);
+
+        foreach (range(1, EnvelopeSigner::MAX_CPF_ATTEMPTS) as $ignored) {
+            $envelope->events()->create(['envelope_signer_id' => $signer->id, 'event' => 'cpf_mismatch']);
+        }
+
+        return [$user, $signer];
+    }
+
+    public function test_owner_can_unlock_a_locked_signer(): void
+    {
+        [$user, $signer] = $this->lockedSigner();
+        $this->assertTrue($signer->isCpfLocked());
+
+        $this->actingAs($user)
+            ->post("/envelopes/{$signer->envelope_id}/signers/{$signer->id}/unlock-cpf")
+            ->assertRedirect();
+
+        $this->assertFalse($signer->fresh()->isCpfLocked());
+        $this->assertTrue($signer->events()->where('event', 'cpf_unlocked')->exists());
+    }
+
+    public function test_unlock_is_denied_for_another_client(): void
+    {
+        [, $signer] = $this->lockedSigner();
+        $intruder = User::factory()->withPlan()->create(['role' => 'client']);
+
+        $this->actingAs($intruder)
+            ->post("/envelopes/{$signer->envelope_id}/signers/{$signer->id}/unlock-cpf")
+            ->assertForbidden();
+
+        $this->assertTrue($signer->fresh()->isCpfLocked());
+    }
+
+    public function test_unlock_rejects_a_signer_from_another_envelope(): void
+    {
+        [$user, $signer] = $this->lockedSigner();
+        $otherEnvelope = Envelope::factory()->create(['user_id' => $user->id]);
+
+        $this->actingAs($user)
+            ->post("/envelopes/{$otherEnvelope->id}/signers/{$signer->id}/unlock-cpf")
+            ->assertNotFound();
+
+        $this->assertTrue($signer->fresh()->isCpfLocked());
+    }
+
+    public function test_show_offers_the_unlock_button_only_when_locked(): void
+    {
+        [$user, $signer] = $this->lockedSigner();
+
+        $this->actingAs($user)->get("/envelopes/{$signer->envelope_id}")
+            ->assertOk()
+            ->assertSee('Desbloquear');
+
+        $this->actingAs($user)->post("/envelopes/{$signer->envelope_id}/signers/{$signer->id}/unlock-cpf");
+
+        $this->actingAs($user)->get("/envelopes/{$signer->envelope_id}")
+            ->assertOk()
+            ->assertDontSee('Desbloquear');
+    }
 }

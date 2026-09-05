@@ -7,12 +7,15 @@ use App\Mail\Envelopes\EnvelopeCancelled;
 use App\Mail\Envelopes\EnvelopeDeclined;
 use App\Mail\Envelopes\EnvelopeInvite;
 use App\Mail\Envelopes\EnvelopeOtp;
+use App\Mail\Envelopes\EnvelopeSignerLocked;
 use App\Models\Envelope;
 use App\Models\EnvelopeEvent;
 use App\Models\EnvelopeSigner;
 use App\Models\Setting;
 use App\Models\User;
 use App\Services\NotificationService;
+use App\Support\ConsentTerm;
+use App\Support\Cpf;
 use App\Support\SignatureImage;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -47,6 +50,7 @@ class EnvelopeService
                     'name' => $s['name'],
                     'email' => $s['email'] ?? null,
                     'whatsapp' => $s['whatsapp'] ?? null,
+                    'expected_cpf' => isset($s['expected_cpf']) ? Cpf::format($s['expected_cpf']) : null,
                     'channel' => $s['channel'] ?? 'email',
                     'auth_method' => $s['auth_method'],
                     'sign_position' => $i + 1,
@@ -152,6 +156,35 @@ class EnvelopeService
         return true;
     }
 
+    /**
+     * Registra uma divergência entre o CPF digitado e o esperado pelo remetente.
+     * Devolve true se esta tentativa fechou o limite e travou o link.
+     *
+     * O CPF tentado vai mascarado: é dado pessoal de terceiro, e o mascarado já
+     * basta para o remetente diagnosticar erro de digitação.
+     */
+    public function recordCpfMismatch(EnvelopeSigner $signer, string $attempted, ?string $ip, ?string $userAgent): bool
+    {
+        $this->recordEvent($signer->envelope, $signer, 'cpf_mismatch', $ip, $userAgent, [
+            'attempted' => Cpf::mask($attempted),
+        ]);
+
+        if (! $signer->fresh()->isCpfLocked()) {
+            return false;
+        }
+
+        $this->recordEvent($signer->envelope, $signer, 'cpf_locked', $ip, $userAgent);
+        Mail::to($signer->envelope->user->email)->send(new EnvelopeSignerLocked($signer->envelope, $signer));
+
+        return true;
+    }
+
+    /** Zera o contador derivado de tentativas, reabrindo o link. */
+    public function unlockCpf(EnvelopeSigner $signer): void
+    {
+        $this->recordEvent($signer->envelope, $signer, 'cpf_unlocked');
+    }
+
     /** Registra a assinatura do convidado. NÃO valida OTP — o controller valida antes. */
     public function sign(EnvelopeSigner $signer, array $data, ?string $ip, ?string $userAgent): void
     {
@@ -162,16 +195,24 @@ class EnvelopeService
 
         $signer->update([
             'name' => $data['name'],
-            'cpf' => $data['cpf'],
+            'cpf' => Cpf::format($data['cpf']),
             'signature_type' => $data['signature_type'],
             'signature_image_path' => $relative,
             'status' => 'signed',
             'signed_at' => now(),
+            'consent_accepted_at' => now(),
+            'consent_version' => ConsentTerm::VERSION,
             'ip_address' => $ip,
             'user_agent' => $userAgent ? mb_substr($userAgent, 0, 500) : null,
         ]);
 
         $envelope = $signer->envelope->fresh();
+
+        // Antes do 'signed' de propósito: a trilha precisa ler na ordem cronológica.
+        $this->recordEvent($envelope, $signer, 'consent_accepted', $ip, $userAgent, [
+            'version' => ConsentTerm::VERSION,
+        ]);
+
         $this->recordEvent($envelope, $signer, 'signed', $ip, $userAgent, [
             'signature_type' => $data['signature_type'],
             'auth_method' => $signer->auth_method,

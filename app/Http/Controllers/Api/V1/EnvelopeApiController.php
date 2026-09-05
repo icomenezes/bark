@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Envelope;
+use App\Rules\Cpf as CpfRule;
 use App\Services\Envelope\EnvelopeService;
 use App\Services\UsageLimitService;
 use Illuminate\Http\Request;
@@ -41,8 +42,11 @@ class EnvelopeApiController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'message' => ['nullable', 'string', 'max:2000'],
             'signer_name' => ['required', 'string', 'max:255'],
-            'signer_email' => ['required', 'email'],
-            'signer_whatsapp' => ['nullable', 'string', 'max:20'],
+            'signer_email' => ['nullable', 'email', 'required_unless:channel,whatsapp'],
+            'signer_whatsapp' => ['nullable', 'string', 'max:20', 'required_if:channel,whatsapp'],
+            'signer_cpf' => ['nullable', 'string', new CpfRule],
+            'channel' => ['nullable', 'in:email,whatsapp'],
+            'auth_method' => ['nullable', 'in:link,email_otp,whatsapp_otp'],
             'send_signed_copy' => ['nullable', 'boolean'],
             'pdf_base64' => ['required', 'string'],
             'field' => ['nullable', 'array'],
@@ -52,6 +56,19 @@ class EnvelopeApiController extends Controller
             'field.w' => ['nullable', 'numeric', 'min:1'],
             'field.h' => ['nullable', 'numeric', 'min:1'],
         ]);
+
+        $channel = $request->input('channel', 'email');
+        $authMethod = $request->input('auth_method', 'link');
+
+        // Coerência antes de decodificar o PDF — não faz sentido gravar arquivo para depois recusar.
+        if ($channel === 'whatsapp' && ! $user->whatsapp_envelope_enabled) {
+            return $this->unprocessable('Canal WhatsApp não habilitado para esta conta.');
+        }
+
+        $allowed = $channel === 'whatsapp' ? ['link', 'whatsapp_otp'] : ['link', 'email_otp'];
+        if (! in_array($authMethod, $allowed, true)) {
+            return $this->unprocessable('Método de verificação incompatível com o canal escolhido.');
+        }
 
         $pdfPath = $this->decodeBase64Pdf($request->input('pdf_base64'));
 
@@ -69,7 +86,9 @@ class EnvelopeApiController extends Controller
                         'name' => $request->input('signer_name'),
                         'email' => $request->input('signer_email'),
                         'whatsapp' => $request->input('signer_whatsapp'),
-                        'auth_method' => 'link',
+                        'expected_cpf' => $request->input('signer_cpf'),
+                        'channel' => $channel,
+                        'auth_method' => $authMethod,
                         'send_signed_copy' => $request->boolean('send_signed_copy', true),
                         'fields' => [
                             $this->resolvePosition($request->input('field', []), $pageCount),

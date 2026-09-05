@@ -124,4 +124,72 @@ class EnvelopeModelTest extends TestCase
 
         $this->assertNull($signer->fresh()->saved_signer_id);
     }
+
+    public function test_cpf_attempts_counts_mismatch_events(): void
+    {
+        $signer = EnvelopeSigner::factory()->create(['expected_cpf' => '529.982.247-25']);
+
+        $this->assertSame(0, $signer->cpfAttempts());
+
+        $this->recordMismatch($signer, 2);
+
+        $this->assertSame(2, $signer->cpfAttempts());
+    }
+
+    public function test_cpf_attempts_ignores_events_of_other_signers(): void
+    {
+        $envelope = Envelope::factory()->create();
+        $signer = EnvelopeSigner::factory()->for($envelope)->create(['expected_cpf' => '529.982.247-25']);
+        $other = EnvelopeSigner::factory()->for($envelope)->create(['sign_position' => 2]);
+
+        $this->recordMismatch($other, 3);
+
+        $this->assertSame(0, $signer->cpfAttempts());
+    }
+
+    public function test_signer_locks_at_five_mismatches(): void
+    {
+        $signer = EnvelopeSigner::factory()->create(['expected_cpf' => '529.982.247-25']);
+
+        $this->recordMismatch($signer, 4);
+        $this->assertFalse($signer->isCpfLocked());
+
+        $this->recordMismatch($signer, 1);
+        $this->assertTrue($signer->isCpfLocked());
+    }
+
+    public function test_unlock_event_resets_the_attempt_count(): void
+    {
+        $signer = EnvelopeSigner::factory()->create(['expected_cpf' => '529.982.247-25']);
+        $this->recordMismatch($signer, 5);
+
+        $signer->envelope->events()->create([
+            'envelope_signer_id' => $signer->id,
+            'event' => 'cpf_unlocked',
+        ]);
+
+        $this->assertSame(0, $signer->cpfAttempts());
+        $this->assertFalse($signer->isCpfLocked());
+
+        $this->recordMismatch($signer, 1);
+        $this->assertSame(1, $signer->cpfAttempts());
+    }
+
+    public function test_signer_without_expected_cpf_never_locks(): void
+    {
+        $signer = EnvelopeSigner::factory()->create(['expected_cpf' => null]);
+        $this->recordMismatch($signer, 9);
+
+        $this->assertFalse($signer->isCpfLocked());
+    }
+
+    private function recordMismatch(EnvelopeSigner $signer, int $times): void
+    {
+        foreach (range(1, $times) as $ignored) {
+            $signer->envelope->events()->create([
+                'envelope_signer_id' => $signer->id,
+                'event' => 'cpf_mismatch',
+            ]);
+        }
+    }
 }

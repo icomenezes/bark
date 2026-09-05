@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Client;
 use App\Http\Controllers\Controller;
 use App\Jobs\SealEnvelopeJob;
 use App\Models\Envelope;
+use App\Models\EnvelopeSigner;
 use App\Services\AccessLogService;
 use App\Services\Envelope\EnvelopeService;
 use App\Services\UsageLimitService;
@@ -156,6 +157,20 @@ class EnvelopeController extends Controller
         SealEnvelopeJob::dispatch($envelope);
 
         return back()->with('success', 'Reprocessamento do lacre iniciado.');
+    }
+
+    /** Reabre o link de um signatário travado por divergências de CPF. */
+    public function unlockCpf(Envelope $envelope, EnvelopeSigner $signer)
+    {
+        $this->authorizeOwner($envelope);
+
+        // O signatário vem da rota: sem esta checagem, o dono de um envelope
+        // desbloquearia signatário de outro.
+        abort_unless($signer->envelope_id === $envelope->id, 404);
+
+        $this->envelopes->unlockCpf($signer);
+
+        return back()->with('success', "Link de {$signer->name} desbloqueado.");
     }
 
     public function download(Envelope $envelope)

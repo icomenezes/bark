@@ -95,6 +95,7 @@ Route::middleware('auth')->group(function () {
     Route::post('envelopes/{envelope}/remind', [EnvelopeController::class, 'remind'])->name('envelopes.remind');
     Route::post('envelopes/{envelope}/cancel', [EnvelopeController::class, 'cancel'])->name('envelopes.cancel');
     Route::post('envelopes/{envelope}/reseal', [EnvelopeController::class, 'reseal'])->name('envelopes.reseal');
+    Route::post('envelopes/{envelope}/signers/{signer}/unlock-cpf', [EnvelopeController::class, 'unlockCpf'])->name('envelopes.signers.unlock-cpf');
     Route::get('envelopes/{envelope}/download', [EnvelopeController::class, 'download'])->name('envelopes.download');
 });
 // Assinatura pública de envelopes — autorização é o próprio token

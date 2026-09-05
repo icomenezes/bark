@@ -18,17 +18,6 @@ use Illuminate\Support\Facades\Storage;
  */
 class EvidenceReportGenerator
 {
-    private const AUTH_LABELS = [
-        'link' => 'link exclusivo',
-        'email_otp' => 'código por e-mail',
-        'whatsapp_otp' => 'código por WhatsApp',
-    ];
-
-    private const SIGNATURE_TYPE_LABELS = [
-        'drawn' => 'Assinatura desenhada na tela',
-        'typed' => 'Nome digitado',
-    ];
-
     /** Ruído operacional interno — fica na trilha imutável do banco, não no certificado. */
     private const HIDDEN_EVENTS = ['seal_failed'];
 
@@ -307,12 +296,12 @@ class EvidenceReportGenerator
         $pdf->SetXY($x + 28, $y);
         $pdf->SetFont('helvetica', 'B', 10);
         $pdf->Cell(280, 12, (string) $signer->name, 0, 2);
-        $pdf->SetX($x + 28);
         $pdf->SetFont('helvetica', '', 8.5);
         $pdf->SetTextColor(102, 102, 102);
-        $pdf->Cell(280, 11, (string) ($signer->email ?? $signer->whatsapp), 0, 2);
-        $pdf->SetX($x + 28);
-        $pdf->Cell(280, 11, 'Assinou em '.($signer->signed_at?->format('d/m/Y H:i:s') ?? '—'), 0, 1);
+        foreach (SignerSummary::lines($signer) as $line) {
+            $pdf->SetX($x + 28);
+            $pdf->Cell(280, 11, $line, 0, 2);
+        }
         $pdf->SetTextColor(0, 0, 0);
 
         if ($signer->signature_image_path && Storage::disk('documents')->exists($signer->signature_image_path)) {
@@ -345,37 +334,10 @@ class EvidenceReportGenerator
         $pdf->Ln(8);
     }
 
-    /** Prosa do evento com destaques em negrito — nunca JSON cru. */
+    /** Prosa do evento — a formatação vive em EventProse, testada isoladamente. */
     private function eventProse(EnvelopeEvent $event): string
     {
-        $meta = $event->meta ?? [];
-        $name = e($event->signer?->name ?? '');
-        $upper = e(mb_strtoupper($event->signer?->name ?? ''));
-        $email = e((string) ($event->signer?->email ?? ''));
-        $ip = $event->ip_address ? ' - IP: '.e($event->ip_address) : '';
-
-        return match ($event->event) {
-            'created' => 'Documento <b>'.$this->currentVerificationCode.'</b> <b>criado</b>.',
-            'sent' => $name === ''
-                ? '<b>Assinaturas iniciadas</b>.'
-                : 'Convite <b>enviado</b> para '.$name.($email !== '' ? ' - Email: '.$email : '').'.',
-            'reminder_sent' => '<b>Lembrete enviado</b> para '.$name.'.',
-            'viewed' => $upper.' <b>visualizou</b> o documento'.$ip.'.',
-            'otp_sent' => 'Código de verificação <b>enviado</b> para '.$name.'.',
-            'otp_failed' => $name.' informou um <b>código incorreto</b>'.$ip.'.',
-            'signed' => $upper.' <b>Assinou</b>'.($email !== '' ? ' - Email: '.$email : '').$ip
-                .(isset(self::AUTH_LABELS[$meta['auth_method'] ?? '']) ? ' - Autenticado com '.self::AUTH_LABELS[$meta['auth_method']] : '')
-                .(isset(self::SIGNATURE_TYPE_LABELS[$meta['signature_type'] ?? '']) ? ' - '.self::SIGNATURE_TYPE_LABELS[$meta['signature_type']] : '')
-                .'.',
-            'declined' => $upper.' <b>recusou</b> a assinatura'
-                .(isset($meta['reason']) ? ' - Motivo: '.e($meta['reason']) : '').$ip.'.',
-            'cancelled' => 'Envelope <b>cancelado</b> pelo remetente.',
-            'sealed' => 'Documento <b>lacrado digitalmente</b>'
-                .(isset($meta['sha256_final']) ? ' - SHA-256 final: '.substr($meta['sha256_final'], 0, 24).'…' : '').'.',
-            'completed' => 'Envelope <b>concluído</b> — todas as assinaturas foram coletadas.',
-            'expired' => 'Envelope <b>expirado</b> sem a conclusão de todas as assinaturas.',
-            default => e($event->event),
-        };
+        return EventProse::for($event, $this->currentVerificationCode);
     }
 
     private function initials(string $name): string

@@ -12,10 +12,15 @@ class EnvelopeSigner extends Model
 {
     use HasFactory;
 
+    /** Divergências de CPF aceitas antes de travar o link do signatário. */
+    public const MAX_CPF_ATTEMPTS = 5;
+
     protected $fillable = [
-        'envelope_id', 'saved_signer_id', 'name', 'email', 'whatsapp', 'cpf', 'channel', 'send_signed_copy',
+        'envelope_id', 'saved_signer_id', 'name', 'email', 'whatsapp', 'cpf', 'expected_cpf',
+        'channel', 'send_signed_copy',
         'auth_method', 'sign_position', 'token', 'status',
         'signature_image_path', 'signature_type',
+        'consent_accepted_at', 'consent_version',
         'otp_code', 'otp_expires_at', 'otp_attempts',
         'signed_at', 'ip_address', 'user_agent', 'decline_reason',
     ];
@@ -27,6 +32,7 @@ class EnvelopeSigner extends Model
         return [
             'otp_expires_at' => 'datetime',
             'signed_at' => 'datetime',
+            'consent_accepted_at' => 'datetime',
             'send_signed_copy' => 'boolean',
         ];
     }
@@ -53,9 +59,35 @@ class EnvelopeSigner extends Model
         return $this->hasMany(EnvelopeField::class);
     }
 
+    public function events(): HasMany
+    {
+        return $this->hasMany(EnvelopeEvent::class, 'envelope_signer_id');
+    }
+
     public function requiresOtp(): bool
     {
         return $this->auth_method !== 'link';
+    }
+
+    /**
+     * Divergências de CPF desde o último desbloqueio.
+     *
+     * Conta por id — os eventos são insert-only e auto-incrementais, enquanto
+     * created_at tem granularidade de segundo e empataria em tentativas rápidas.
+     */
+    public function cpfAttempts(): int
+    {
+        $lastUnlock = $this->events()->where('event', 'cpf_unlocked')->max('id');
+
+        return $this->events()
+            ->where('event', 'cpf_mismatch')
+            ->when($lastUnlock, fn ($query) => $query->where('id', '>', $lastUnlock))
+            ->count();
+    }
+
+    public function isCpfLocked(): bool
+    {
+        return $this->expected_cpf !== null && $this->cpfAttempts() >= self::MAX_CPF_ATTEMPTS;
     }
 
     /** Pode assinar agora: envelope enviado, não expirado, e este signatário ainda pendente. */

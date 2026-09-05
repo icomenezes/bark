@@ -4,12 +4,17 @@ namespace App\Http\Controllers\PublicSign;
 
 use App\Http\Controllers\Controller;
 use App\Models\EnvelopeSigner;
+use App\Rules\Cpf as CpfRule;
 use App\Services\Envelope\EnvelopeService;
+use App\Support\ConsentTerm;
+use App\Support\Cpf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class SignEnvelopeController extends Controller
 {
+    private const LOCKED_REASON = 'Este link foi bloqueado por tentativas repetidas de identificação incorreta. Fale com o remetente.';
+
     public function __construct(private EnvelopeService $envelopes) {}
 
     public function show(Request $request, string $token)
@@ -22,7 +27,13 @@ class SignEnvelopeController extends Controller
 
         $this->envelopes->markViewed($signer, $request->ip(), $request->userAgent());
 
-        return view('public.sign.show', ['signer' => $signer->fresh(), 'envelope' => $signer->envelope]);
+        $signer = $signer->fresh();
+
+        return view('public.sign.show', [
+            'signer' => $signer,
+            'envelope' => $signer->envelope,
+            'consentTerm' => ConsentTerm::text($signer),
+        ]);
     }
 
     /** Serve o PDF ao signatário: original durante a coleta, final após concluído. */
@@ -68,16 +79,34 @@ class SignEnvelopeController extends Controller
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'cpf' => ['required', 'string', 'regex:/^\d{3}\.\d{3}\.\d{3}-\d{2}$/'],
+            'cpf' => ['required', 'string', new CpfRule],
+            'consent' => ['accepted'],
             'signature_type' => ['required', 'in:drawn,typed'],
             'signature' => ['required', 'string', 'max:3000000'],
             'otp_code' => [$signer->requiresOtp() ? 'required' : 'nullable', 'digits:6'],
         ], [
-            'cpf.regex' => 'Informe o CPF no formato 000.000.000-00.',
+            'consent.accepted' => 'É necessário aceitar o termo para assinar.',
         ]);
 
         if ($signer->requiresOtp() && ! $this->envelopes->verifyOtp($signer, $data['otp_code'])) {
             return back()->withErrors(['otp_code' => 'Código inválido ou expirado. Solicite um novo.'])->withInput();
+        }
+
+        // Depois do OTP de propósito: só quem tem o código consegue queimar as tentativas.
+        if ($signer->expected_cpf !== null
+            && Cpf::digits($data['cpf']) !== Cpf::digits($signer->expected_cpf)) {
+            $locked = $this->envelopes->recordCpfMismatch($signer, $data['cpf'], $request->ip(), $request->userAgent());
+
+            if ($locked) {
+                return view('public.sign.unavailable', [
+                    'signer' => $signer,
+                    'reason' => self::LOCKED_REASON,
+                ]);
+            }
+
+            return back()
+                ->withErrors(['cpf' => 'O CPF informado não confere com o do destinatário deste documento.'])
+                ->withInput();
         }
 
         try {
@@ -144,6 +173,7 @@ class SignEnvelopeController extends Controller
 
         return match (true) {
             $signer->status === 'signed' => 'Você já assinou este documento. Quando todos assinarem, receberá o PDF final por e-mail.',
+            $signer->isCpfLocked() => self::LOCKED_REASON,
             $envelope->status === 'completed' => 'Este documento já foi concluído. O PDF final foi enviado ao seu e-mail.',
             $envelope->status === 'declined' => 'Este documento foi encerrado após uma recusa e não está mais disponível.',
             $envelope->status === 'cancelled' => 'Este documento foi cancelado pelo remetente e não está mais disponível para assinatura.',

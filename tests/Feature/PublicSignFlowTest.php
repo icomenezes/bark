@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Jobs\SealEnvelopeJob;
 use App\Mail\Envelopes\EnvelopeOtp;
+use App\Mail\Envelopes\EnvelopeSignerLocked;
 use App\Models\Envelope;
 use App\Models\EnvelopeSigner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -38,8 +39,9 @@ class PublicSignFlowTest extends TestCase
     private function signPayload(array $extra = []): array
     {
         return array_merge([
-            'name' => 'Ana Completa', 'cpf' => '123.456.789-00',
+            'name' => 'Ana Completa', 'cpf' => '123.456.789-09',
             'signature_type' => 'drawn', 'signature' => $this->pngDataUrl(),
+            'consent' => '1',
         ], $extra);
     }
 
@@ -229,5 +231,169 @@ class PublicSignFlowTest extends TestCase
         $signer->envelope->update(['status' => 'completed', 'final_pdf_path' => $finalPath]);
 
         $this->get("/sign/{$signer->token}/document")->assertRedirect();
+    }
+
+    // ─── Termo de aceite ──────────────────────────────────────────────────────
+
+    public function test_signing_without_accepting_the_term_is_rejected(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        Mail::fake();
+        $signer = $this->makeSentEnvelope();
+
+        $payload = $this->signPayload();
+        unset($payload['consent']);
+
+        $this->post("/sign/{$signer->token}", $payload)->assertSessionHasErrors('consent');
+
+        $this->assertNotSame('signed', $signer->fresh()->status);
+    }
+
+    public function test_accepting_the_term_is_recorded_on_the_signer_and_the_trail(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        Queue::fake();
+        Mail::fake();
+        $signer = $this->makeSentEnvelope();
+
+        $this->post("/sign/{$signer->token}", $this->signPayload())->assertOk();
+
+        $signer->refresh();
+        $this->assertNotNull($signer->consent_accepted_at);
+        $this->assertSame('v1', $signer->consent_version);
+
+        $event = $signer->events()->where('event', 'consent_accepted')->first();
+        $this->assertNotNull($event);
+        $this->assertSame('v1', $event->meta['version']);
+    }
+
+    public function test_consent_event_is_recorded_before_the_signature_event(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        Queue::fake();
+        Mail::fake();
+        $signer = $this->makeSentEnvelope();
+
+        $this->post("/sign/{$signer->token}", $this->signPayload())->assertOk();
+
+        $consentId = $signer->events()->where('event', 'consent_accepted')->value('id');
+        $signedId = $signer->events()->where('event', 'signed')->value('id');
+
+        $this->assertLessThan($signedId, $consentId);
+    }
+
+    public function test_sign_screen_shows_the_term_naming_the_channel(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        $signer = $this->makeSentEnvelope(['channel' => 'email', 'email' => 'joao@exemplo.com']);
+
+        $this->get("/sign/{$signer->token}")
+            ->assertOk()
+            ->assertSee('o e-mail joao@exemplo.com', false);
+    }
+
+    // ─── Conferência de CPF ───────────────────────────────────────────────────
+
+    public function test_cpf_with_invalid_check_digits_is_rejected(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        Mail::fake();
+        $signer = $this->makeSentEnvelope();
+
+        $this->post("/sign/{$signer->token}", $this->signPayload(['cpf' => '111.111.111-11']))
+            ->assertSessionHasErrors('cpf');
+
+        $this->assertNotSame('signed', $signer->fresh()->status);
+    }
+
+    public function test_cpf_divergent_from_expected_blocks_and_records_a_masked_event(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        Mail::fake();
+        $signer = $this->makeSentEnvelope(['expected_cpf' => '529.982.247-25']);
+
+        $this->post("/sign/{$signer->token}", $this->signPayload(['cpf' => '111.444.777-35']))
+            ->assertSessionHasErrors('cpf');
+
+        $this->assertNotSame('signed', $signer->fresh()->status);
+
+        $event = $signer->events()->where('event', 'cpf_mismatch')->first();
+        $this->assertNotNull($event);
+        $this->assertSame('***.444.777-**', $event->meta['attempted']);
+    }
+
+    public function test_matching_cpf_signs_regardless_of_formatting(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        Queue::fake();
+        Mail::fake();
+        $signer = $this->makeSentEnvelope(['expected_cpf' => '529.982.247-25']);
+
+        $this->post("/sign/{$signer->token}", $this->signPayload(['cpf' => '52998224725']))
+            ->assertOk()
+            ->assertSee('Documento assinado com sucesso');
+
+        $this->assertSame('signed', $signer->fresh()->status);
+    }
+
+    public function test_fifth_mismatch_locks_the_link_and_notifies_the_sender(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        Mail::fake();
+        $signer = $this->makeSentEnvelope(['expected_cpf' => '529.982.247-25']);
+
+        foreach (range(1, 5) as $ignored) {
+            $this->post("/sign/{$signer->token}", $this->signPayload(['cpf' => '111.444.777-35']));
+        }
+
+        $this->assertTrue($signer->fresh()->isCpfLocked());
+        $this->assertTrue($signer->events()->where('event', 'cpf_locked')->exists());
+        Mail::assertSent(EnvelopeSignerLocked::class, 1);
+
+        $this->get("/sign/{$signer->token}")->assertOk()->assertSee('bloqueado');
+    }
+
+    public function test_locked_link_refuses_even_the_correct_cpf(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        Mail::fake();
+        $signer = $this->makeSentEnvelope(['expected_cpf' => '529.982.247-25']);
+
+        foreach (range(1, 5) as $ignored) {
+            $this->post("/sign/{$signer->token}", $this->signPayload(['cpf' => '111.444.777-35']));
+        }
+
+        $this->post("/sign/{$signer->token}", $this->signPayload(['cpf' => '529.982.247-25']))
+            ->assertOk()
+            ->assertSee('bloqueado');
+
+        $this->assertNotSame('signed', $signer->fresh()->status);
+    }
+
+    public function test_mismatch_is_only_counted_after_a_valid_otp(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        Mail::fake();
+        $signer = $this->makeSentEnvelope([
+            'auth_method' => 'email_otp',
+            'expected_cpf' => '529.982.247-25',
+        ]);
+
+        $this->post("/sign/{$signer->token}", $this->signPayload([
+            'cpf' => '111.444.777-35',
+            'otp_code' => '000000',
+        ]))->assertSessionHasErrors('otp_code');
+
+        $this->assertSame(0, $signer->fresh()->cpfAttempts());
     }
 }

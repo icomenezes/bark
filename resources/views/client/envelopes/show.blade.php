@@ -98,6 +98,21 @@ $channelLabels = ['email' => 'E-mail', 'whatsapp' => 'WhatsApp'];
                 @elseif ($signer->status === 'declined' && $signer->decline_reason)
                     <p class="text-xs text-red-400">Motivo: {{ $signer->decline_reason }}</p>
                 @endif
+
+                @if ($signer->isCpfLocked())
+                    <div class="mt-2 pt-2 border-t border-gray-800 space-y-1.5">
+                        <p class="text-xs text-red-400">
+                            Link bloqueado após {{ \App\Models\EnvelopeSigner::MAX_CPF_ATTEMPTS }} tentativas
+                            com CPF diferente do informado no envio.
+                        </p>
+                        <form method="POST" action="{{ route('envelopes.signers.unlock-cpf', [$envelope, $signer]) }}">
+                            @csrf
+                            <button type="submit" class="px-2.5 py-1 rounded text-xs bg-gray-800 text-gray-300 hover:bg-gray-700 transition-colors">
+                                Desbloquear
+                            </button>
+                        </form>
+                    </div>
+                @endif
             </div>
         @endforeach
     </div>

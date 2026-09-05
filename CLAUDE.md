@@ -150,20 +150,26 @@ plataforma. Spec: `docs/superpowers/specs/2026-07-15-envelopes-assinatura-eletro
 ### Tabelas
 - `envelopes` — user_id, title, message, original/final_pdf_path, sha256_original/final,
   `signing_order` (`parallel`|`sequential`), `status` (`draft`|`sent`|`completed`|`declined`|`cancelled`|`expired`), expires_at, completed_at
-- `envelope_signers` — envelope_id, name, email, whatsapp, cpf, `auth_method` (`link`|`email_otp`|`whatsapp_otp`),
+- `envelope_signers` — envelope_id, name, email, whatsapp, cpf, `expected_cpf` (CPF que o remetente
+  informou; null = sem conferência), `auth_method` (`link`|`email_otp`|`whatsapp_otp`),
   sign_position, `token` (64, único, link público), `status` (`pending`|`notified`|`viewed`|`signed`|`declined`),
-  signature_image_path, signature_type, otp_* (hash, expira 10 min, 5 tentativas), signed_at, ip/user_agent, decline_reason
+  signature_image_path, signature_type, `consent_accepted_at`/`consent_version` (aceite do meio
+  eletrônico), otp_* (hash, expira 10 min, 5 tentativas), signed_at, ip/user_agent, decline_reason
 - `envelope_fields` — posições de assinatura por signer (page, x, y, w, h em pontos PDF topo-esquerdo)
 - `envelope_events` — trilha de auditoria **imutável** (só INSERT, `UPDATED_AT = null`)
 
 ### Rotas
 - Cliente (`auth`): `/envelopes` index/create/store/show + `remind`/`cancel`/`reseal`/`download`
+  + `POST envelopes/{envelope}/signers/{signer}/unlock-cpf` (reabre link travado)
 - Públicas (autorização = token, com throttle): `GET /sign/{token}` (show), `GET /sign/{token}/document`,
   `POST /sign/{token}/otp`, `POST /sign/{token}` (assinar), `POST /sign/{token}/decline`
 
 ### Serviços (`app/Services/Envelope/`)
 - `EnvelopeService` — create/send/notifySigner/markViewed/issueOtp/verifyOtp/sign/decline/cancel/recordEvent
+  + `recordCpfMismatch`/`unlockCpf`
 - `EvidenceReportGenerator` — página(s) de evidências (TCPDF, unidade pt)
+- `EventProse` / `SignerSummary` — texto do certificado (evento e linha do signatário), puros e testáveis
+  fora do PDF; o gerador só desenha o que vem deles
 - `EnvelopePdfComposer` — original + carimbos (FPDI pt, aplicação direta) + evidências; **nunca** sobre PDF já assinado
 - `SealEnvelopeJob` — quando todos assinam: compõe + assina via `PdfSignerService` com o certificado
   da plataforma (`settings.platform_certificate_id`, configurável em `/admin/settings`); saída em
@@ -171,6 +177,14 @@ plataforma. Spec: `docs/superpowers/specs/2026-07-15-envelopes-assinatura-eletro
 
 ### Regras
 - `send()` exige certificado da plataforma configurado e não vencido
+- **CPF**: `App\Support\Cpf` (digits/isValid/format/mask) + `App\Rules\Cpf`. O banco guarda formatado;
+  **toda comparação passa por `Cpf::digits()`**. Se o signatário tem `expected_cpf`, um CPF divergente
+  bloqueia a assinatura e grava `cpf_mismatch` (com o CPF tentado **mascarado** — dado de terceiro);
+  na 5ª (`EnvelopeSigner::MAX_CPF_ATTEMPTS`) grava `cpf_locked` e avisa o remetente. Tentativas e
+  bloqueio são **derivados** dos eventos (contados por `id` após o último `cpf_unlocked`), não há
+  coluna contador. A conferência roda **depois** do OTP, para que só quem tem o código queime tentativas.
+- **Aceite**: checkbox obrigatório na tela pública com o texto de `App\Support\ConsentTerm` (versionado;
+  mudar o texto exige `VERSION` nova). Grava `consent_accepted_at`/`consent_version` + evento `consent_accepted`.
 - Assinaturas de convidados são só dados (PNG em `envelopes/{id}/signatures/` + eventos); o PDF é
   modificado uma única vez, no lacre
 - Recusa de qualquer signatário encerra o envelope inteiro
