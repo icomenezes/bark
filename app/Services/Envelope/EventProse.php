@@ -40,6 +40,7 @@ class EventProse
                 : 'Convite <b>enviado</b> para '.$name.($email !== '' ? ' - Email: '.$email : '').'.',
             'reminder_sent' => '<b>Lembrete enviado</b> para '.$name.'.',
             'viewed' => $upper.' <b>visualizou</b> o documento'.$ip.'.',
+            'owner_previewed' => 'O <b>remetente</b> abriu o link de assinatura de '.$name.$ip.'.',
             'otp_sent' => 'Código de verificação <b>enviado</b> para '.$name.'.',
             'otp_failed' => $name.' informou um <b>código incorreto</b>'.$ip.'.',
             'consent_accepted' => $upper.' <b>aceitou o termo de assinatura eletrônica</b>'

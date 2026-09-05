@@ -185,6 +185,10 @@ plataforma. Spec: `docs/superpowers/specs/2026-07-15-envelopes-assinatura-eletro
   coluna contador. A conferência roda **depois** do OTP, para que só quem tem o código queime tentativas.
 - **Aceite**: checkbox obrigatório na tela pública com o texto de `App\Support\ConsentTerm` (versionado;
   mudar o texto exige `VERSION` nova). Grava `consent_accepted_at`/`consent_version` + evento `consent_accepted`.
+- **Link de assinatura**: o token é a credencial — quem abre assina. Aparece no `/envelopes/{id}` só
+  para copiar (nunca como `<a href>`) e só enquanto o signatário pode assinar. Se o **dono** abrir
+  `/sign/{token}`, grava `owner_previewed` em vez de `viewed` e **não** mexe no status: atribuir a
+  visualização ao signatário poria uma afirmação falsa no certificado de evidências.
 - Assinaturas de convidados são só dados (PNG em `envelopes/{id}/signatures/` + eventos); o PDF é
   modificado uma única vez, no lacre
 - Recusa de qualquer signatário encerra o envelope inteiro

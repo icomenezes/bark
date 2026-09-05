@@ -25,7 +25,12 @@ class SignEnvelopeController extends Controller
             return view('public.sign.unavailable', ['signer' => $signer, 'reason' => $unavailable]);
         }
 
-        $this->envelopes->markViewed($signer, $request->ip(), $request->userAgent());
+        // O dono conferindo o próprio envelope não pode virar "o signatário visualizou".
+        if ($request->user()?->id === $signer->envelope->user_id) {
+            $this->envelopes->recordOwnerPreview($signer, $request->ip(), $request->userAgent());
+        } else {
+            $this->envelopes->markViewed($signer, $request->ip(), $request->userAgent());
+        }
 
         $signer = $signer->fresh();
 

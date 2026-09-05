@@ -303,6 +303,40 @@ class EnvelopeControllerTest extends TestCase
         $this->assertSame($contact->id, $envelope->signers->first()->saved_signer_id);
     }
 
+    // ─── Link de assinatura na tela do envelope ───────────────────────────────
+
+    public function test_show_exposes_the_signing_link_for_a_pending_signer(): void
+    {
+        $user = User::factory()->withPlan()->create(['role' => 'client']);
+        $envelope = Envelope::factory()->create(['user_id' => $user->id, 'status' => 'sent']);
+        $signer = EnvelopeSigner::factory()->for($envelope)->create(['status' => 'notified']);
+
+        $this->actingAs($user)->get("/envelopes/{$envelope->id}")
+            ->assertOk()
+            ->assertSee($signer->token, false)
+            ->assertSee('Copiar link');
+    }
+
+    public function test_show_hides_the_link_once_the_signer_has_signed(): void
+    {
+        $user = User::factory()->withPlan()->create(['role' => 'client']);
+        $envelope = Envelope::factory()->create(['user_id' => $user->id, 'status' => 'sent']);
+        $signer = EnvelopeSigner::factory()->for($envelope)->create(['status' => 'signed', 'signed_at' => now()]);
+
+        $this->actingAs($user)->get("/envelopes/{$envelope->id}")
+            ->assertOk()
+            ->assertDontSee($signer->token, false);
+    }
+
+    public function test_show_hides_the_link_of_a_locked_signer(): void
+    {
+        [$user, $signer] = $this->lockedSigner();
+
+        $this->actingAs($user)->get("/envelopes/{$signer->envelope_id}")
+            ->assertOk()
+            ->assertDontSee($signer->token, false);
+    }
+
     // ─── Desbloqueio de CPF ───────────────────────────────────────────────────
 
     /** @return array{0: User, 1: EnvelopeSigner} */

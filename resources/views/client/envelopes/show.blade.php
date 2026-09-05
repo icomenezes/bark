@@ -99,6 +99,29 @@ $channelLabels = ['email' => 'E-mail', 'whatsapp' => 'WhatsApp'];
                     <p class="text-xs text-red-400">Motivo: {{ $signer->decline_reason }}</p>
                 @endif
 
+                @if ($signer->canSign() && ! $signer->isCpfLocked())
+                    {{-- O token é a credencial de assinatura: exibido para copiar e repassar,
+                         nunca como <a href> — abrir o link a partir daqui registraria o acesso
+                         do remetente como se fosse do signatário. --}}
+                    @php $signLink = route('public.sign.show', $signer->token); @endphp
+                    <div class="mt-2 pt-2 border-t border-gray-800" x-data="{ copied: false }">
+                        <p class="text-xs text-gray-500 mb-1">Link de assinatura</p>
+                        <div class="flex items-center gap-2">
+                            <input type="text" readonly value="{{ $signLink }}" x-ref="link"
+                                   @focus="$refs.link.select()"
+                                   class="flex-1 min-w-0 bg-gray-950 border border-gray-800 rounded px-2 py-1 text-xs text-gray-400 font-mono">
+                            <button type="button"
+                                    @click="navigator.clipboard.writeText($refs.link.value); copied = true; setTimeout(() => copied = false, 2000)"
+                                    class="shrink-0 px-2.5 py-1 rounded text-xs bg-gray-800 text-gray-300 hover:bg-gray-700 transition-colors">
+                                <span x-text="copied ? 'Copiado!' : 'Copiar link'">Copiar link</span>
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-600 mt-1">
+                            Quem abrir este link assina. Não abra para conferir — repasse ao signatário.
+                        </p>
+                    </div>
+                @endif
+
                 @if ($signer->isCpfLocked())
                     <div class="mt-2 pt-2 border-t border-gray-800 space-y-1.5">
                         <p class="text-xs text-red-400">

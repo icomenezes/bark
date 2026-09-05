@@ -116,6 +116,18 @@ class EnvelopeService
         $this->recordEvent($signer->envelope, $signer, 'viewed', $ip, $userAgent);
     }
 
+    /**
+     * O remetente abriu o link do próprio signatário.
+     *
+     * NÃO mexe no status nem grava 'viewed': isso atribuiria ao signatário uma
+     * visualização que não foi dele, dentro do documento que existe para provar
+     * autoria. O acesso fica registrado como do remetente, com IP próprio.
+     */
+    public function recordOwnerPreview(EnvelopeSigner $signer, ?string $ip, ?string $userAgent): void
+    {
+        $this->recordEvent($signer->envelope, $signer, 'owner_previewed', $ip, $userAgent);
+    }
+
     /** Gera OTP de 6 dígitos (10 min, hash no banco) e envia pelo canal do signatário. */
     public function issueOtp(EnvelopeSigner $signer): void
     {

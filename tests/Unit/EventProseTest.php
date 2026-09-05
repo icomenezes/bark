@@ -65,6 +65,16 @@ class EventProseTest extends TestCase
         $this->assertStringContainsString('desbloqueado', $unlocked);
     }
 
+    public function test_owner_preview_is_attributed_to_the_sender_not_the_signer(): void
+    {
+        $prose = EventProse::for($this->event('owner_previewed', [], '10.0.0.9'), 'ABC-123');
+
+        $this->assertStringContainsString('remetente', $prose);
+        $this->assertStringContainsString('Ana Prova', $prose);
+        $this->assertStringContainsString('10.0.0.9', $prose);
+        $this->assertStringNotContainsString('visualizou', $prose);
+    }
+
     public function test_unknown_event_falls_back_to_its_name(): void
     {
         $this->assertSame('algo_novo', EventProse::for($this->event('algo_novo'), 'ABC-123'));

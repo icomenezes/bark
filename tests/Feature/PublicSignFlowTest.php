@@ -7,6 +7,7 @@ use App\Mail\Envelopes\EnvelopeOtp;
 use App\Mail\Envelopes\EnvelopeSignerLocked;
 use App\Models\Envelope;
 use App\Models\EnvelopeSigner;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
@@ -57,6 +58,53 @@ class PublicSignFlowTest extends TestCase
 
         $this->assertSame('viewed', $signer->fresh()->status);
         $this->assertTrue($signer->envelope->events()->where('event', 'viewed')->exists());
+    }
+
+    public function test_owner_preview_does_not_forge_a_viewed_event(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        $signer = $this->makeSentEnvelope();
+        $owner = $signer->envelope->user;
+
+        $this->actingAs($owner)->get("/sign/{$signer->token}")->assertOk();
+
+        $this->assertSame('notified', $signer->fresh()->status);
+        $this->assertFalse($signer->events()->where('event', 'viewed')->exists());
+        $this->assertTrue($signer->events()->where('event', 'owner_previewed')->exists());
+    }
+
+    public function test_another_logged_in_user_is_treated_as_a_regular_visitor(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        $signer = $this->makeSentEnvelope();
+        $stranger = User::factory()->create(['role' => 'client']);
+
+        $this->actingAs($stranger)->get("/sign/{$signer->token}")->assertOk();
+
+        $this->assertSame('viewed', $signer->fresh()->status);
+        $this->assertTrue($signer->events()->where('event', 'viewed')->exists());
+        $this->assertFalse($signer->events()->where('event', 'owner_previewed')->exists());
+    }
+
+    public function test_owner_preview_does_not_block_the_real_signer_later(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        Queue::fake();
+        Mail::fake();
+        $signer = $this->makeSentEnvelope();
+
+        $this->actingAs($signer->envelope->user)->get("/sign/{$signer->token}")->assertOk();
+
+        auth()->logout();
+        $this->get("/sign/{$signer->token}")->assertOk();
+        $this->assertSame('viewed', $signer->fresh()->status);
+
+        $this->post("/sign/{$signer->token}", $this->signPayload())
+            ->assertOk()
+            ->assertSee('Documento assinado com sucesso');
     }
 
     public function test_invalid_token_and_unavailable_states(): void
