@@ -67,7 +67,7 @@ $statusColors = ['draft' => 'bg-gray-100 text-gray-700', 'sent' => 'bg-blue-100 
                 this.fetchResults();
             },
 
-            fetchResults(url = null) {
+            fetchResults(url = null, pushHistory = true) {
                 const target = url ?? this.buildUrl();
 
                 fetch(target, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
@@ -79,9 +79,18 @@ $statusColors = ['draft' => 'bg-gray-100 text-gray-700', 'sent' => 'bg-blue-100 
                             document.getElementById('envelopes-table-wrapper').innerHTML = newWrapper.innerHTML;
                             this.bindPaginationLinks();
                         }
-                        window.history.pushState({}, '', target);
+                        if (pushHistory) {
+                            window.history.pushState({}, '', target);
+                        }
                     })
                     .catch(() => {});
+            },
+
+            syncFromLocation() {
+                const params = new URLSearchParams(window.location.search);
+                this.query = params.get('q') ?? '';
+                this.status = params.get('status') ?? '';
+                this.fetchResults(window.location.href, false);
             },
 
             buildUrl() {
@@ -103,6 +112,7 @@ $statusColors = ['draft' => 'bg-gray-100 text-gray-700', 'sent' => 'bg-blue-100 
 
             init() {
                 this.bindPaginationLinks();
+                window.addEventListener('popstate', () => this.syncFromLocation());
             },
         };
     }
