@@ -473,6 +473,17 @@ class EnvelopeControllerTest extends TestCase
         $response->assertOk()->assertSee('q=Contrato', false)->assertSee('status=completed', false);
     }
 
+    public function test_index_uses_the_custom_pagination_view(): void
+    {
+        $owner = User::factory()->create(['role' => 'client']);
+        Envelope::factory(25)->for($owner)->create();
+
+        $this->actingAs($owner)->get('/envelopes')
+            ->assertOk()
+            ->assertSee('aria-label="Paginação"', false)
+            ->assertSee('Mostrando', false);
+    }
+
     public function test_index_renders_search_input_and_status_filter(): void
     {
         $owner = User::factory()->create(['role' => 'client']);
