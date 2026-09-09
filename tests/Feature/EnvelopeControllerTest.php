@@ -404,4 +404,72 @@ class EnvelopeControllerTest extends TestCase
             ->assertOk()
             ->assertDontSee('Desbloquear');
     }
+
+    // ─── Busca e filtro de status ──────────────────────────────────────────
+
+    public function test_index_filters_by_title_search(): void
+    {
+        $owner = User::factory()->create(['role' => 'client']);
+        Envelope::factory()->for($owner)->create(['title' => 'Contrato de Aluguel']);
+        Envelope::factory()->for($owner)->create(['title' => 'Termo de Confidencialidade']);
+
+        $response = $this->actingAs($owner)->get('/envelopes?q=Aluguel');
+
+        $response->assertOk()->assertSee('Contrato de Aluguel')->assertDontSee('Termo de Confidencialidade');
+    }
+
+    public function test_index_search_is_case_insensitive(): void
+    {
+        $owner = User::factory()->create(['role' => 'client']);
+        Envelope::factory()->for($owner)->create(['title' => 'Contrato de Aluguel']);
+
+        $this->actingAs($owner)->get('/envelopes?q=aluguel')
+            ->assertOk()->assertSee('Contrato de Aluguel');
+    }
+
+    public function test_index_filters_by_status(): void
+    {
+        $owner = User::factory()->create(['role' => 'client']);
+        Envelope::factory()->for($owner)->create(['title' => 'Envelope Concluído', 'status' => 'completed']);
+        Envelope::factory()->for($owner)->create(['title' => 'Envelope Cancelado', 'status' => 'cancelled']);
+
+        $response = $this->actingAs($owner)->get('/envelopes?status=completed');
+
+        $response->assertOk()->assertSee('Envelope Concluído')->assertDontSee('Envelope Cancelado');
+    }
+
+    public function test_index_combines_search_and_status_filters(): void
+    {
+        $owner = User::factory()->create(['role' => 'client']);
+        Envelope::factory()->for($owner)->create(['title' => 'Contrato Alfa', 'status' => 'completed']);
+        Envelope::factory()->for($owner)->create(['title' => 'Contrato Beta', 'status' => 'cancelled']);
+        Envelope::factory()->for($owner)->create(['title' => 'Outro Documento', 'status' => 'completed']);
+
+        $response = $this->actingAs($owner)->get('/envelopes?q=Contrato&status=completed');
+
+        $response->assertOk()
+            ->assertSee('Contrato Alfa')
+            ->assertDontSee('Contrato Beta')
+            ->assertDontSee('Outro Documento');
+    }
+
+    public function test_index_without_filters_returns_all_envelopes(): void
+    {
+        $owner = User::factory()->create(['role' => 'client']);
+        Envelope::factory()->for($owner)->create(['title' => 'Envelope Um']);
+        Envelope::factory()->for($owner)->create(['title' => 'Envelope Dois']);
+
+        $this->actingAs($owner)->get('/envelopes')
+            ->assertOk()->assertSee('Envelope Um')->assertSee('Envelope Dois');
+    }
+
+    public function test_index_preserves_filters_in_pagination_links(): void
+    {
+        $owner = User::factory()->create(['role' => 'client']);
+        Envelope::factory(25)->for($owner)->create(['title' => 'Contrato Recorrente', 'status' => 'completed']);
+
+        $response = $this->actingAs($owner)->get('/envelopes?q=Contrato&status=completed');
+
+        $response->assertOk()->assertSee('q=Contrato', false)->assertSee('status=completed', false);
+    }
 }

@@ -23,12 +23,15 @@ class EnvelopeController extends Controller
         private \App\Services\SignerDirectoryService $signerDirectory,
     ) {}
 
-    public function index()
+    public function index(Request $request)
     {
         $envelopes = Envelope::where('user_id', auth()->id())
+            ->when($request->filled('q'), fn ($q) => $q->where('title', 'like', '%'.$request->string('q').'%'))
+            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
             ->withCount(['signers', 'signers as signed_count' => fn ($q) => $q->where('status', 'signed')])
             ->latest()
-            ->paginate(20);
+            ->paginate(20)
+            ->withQueryString();
 
         return view('client.envelopes.index', compact('envelopes'));
     }
