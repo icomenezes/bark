@@ -472,4 +472,27 @@ class EnvelopeControllerTest extends TestCase
 
         $response->assertOk()->assertSee('q=Contrato', false)->assertSee('status=completed', false);
     }
+
+    public function test_index_renders_search_input_and_status_filter(): void
+    {
+        $owner = User::factory()->create(['role' => 'client']);
+        Envelope::factory()->for($owner)->create(['title' => 'Envelope de Teste']);
+
+        $response = $this->actingAs($owner)->get('/envelopes');
+
+        $response->assertOk()
+            ->assertSee('name="q"', false)
+            ->assertSee('name="status"', false)
+            ->assertSee('envelopes-table-wrapper', false);
+    }
+
+    public function test_index_shows_empty_state_message_for_search_with_no_results(): void
+    {
+        $owner = User::factory()->create(['role' => 'client']);
+        Envelope::factory()->for($owner)->create(['title' => 'Envelope Existente']);
+
+        $this->actingAs($owner)->get('/envelopes?q=NadaAVerComIsso')
+            ->assertOk()
+            ->assertSee('Nenhum envelope encontrado');
+    }
 }
