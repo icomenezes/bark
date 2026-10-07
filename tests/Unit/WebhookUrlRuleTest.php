@@ -4,10 +4,39 @@ namespace Tests\Unit;
 
 use App\Rules\WebhookUrl;
 use Illuminate\Support\Facades\Validator;
+use Tests\Concerns\FakesWebhookDns;
 use Tests\TestCase;
 
 class WebhookUrlRuleTest extends TestCase
 {
+    use FakesWebhookDns;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->fakeWebhookDns([
+            'ponto.example.com' => ['93.184.216.34'],
+            'api.cliente.com.br' => ['200.160.2.3', '2001:12ff::10'],
+            'interno.example.com' => ['10.0.0.5'],
+            'misto.example.com' => ['93.184.216.34', '127.0.0.1'],
+            'loopback6.example.com' => ['::1'],
+        ]);
+    }
+
+    public function test_rejects_domains_that_resolve_to_internal_addresses(): void
+    {
+        // Domínio público apontando para IP interno: só a resolução do DNS pega.
+        $this->assertFalse($this->passes('https://interno.example.com/hook'));
+        $this->assertFalse($this->passes('https://misto.example.com/hook'));
+        $this->assertFalse($this->passes('https://loopback6.example.com/hook'));
+    }
+
+    public function test_rejects_domains_that_do_not_resolve(): void
+    {
+        $this->assertFalse($this->passes('https://nao-existe.example.com/hook'));
+    }
+
     private function passes(string $url): bool
     {
         return Validator::make(['url' => $url], ['url' => [new WebhookUrl]])->passes();

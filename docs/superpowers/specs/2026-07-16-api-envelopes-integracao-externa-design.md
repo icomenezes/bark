@@ -362,9 +362,9 @@ O receptor deve:
   - `POST /integration/secret` (`integration.secret`)
   - `POST /integration/test` (`integration.test`)
 - **URL**: campo único; salvar vazio desativa os webhooks. Regra `App\Rules\WebhookUrl`:
-  URL `http(s)` de até 2048 caracteres. Fora do ambiente `local`, só `https`, e o host
-  não pode ser `localhost` nem IP literal de rede privada ou reservada. Em `local`
-  aceita `http` e `localhost`, para o integrador testar na própria máquina.
+  URL `http(s)` de até 2048 caracteres, com o destino conferido pela
+  `WebhookDestination` (ver "Segurança" abaixo). Em `local` aceita `http` e
+  `localhost`, para o integrador testar na própria máquina.
 - **Segredo**: gerado automaticamente (`whsec_` + 40 caracteres aleatórios) quando a
   URL é salva pela primeira vez, e exibido na tela para copiar. O botão
   "Gerar novo segredo" troca na hora; tentativas pendentes já saem assinadas com o
@@ -375,12 +375,27 @@ O receptor deve:
 - **Últimas entregas**: as 20 tentativas mais recentes da conta, com data e hora,
   evento, envelope, número da tentativa e resultado.
 
-Segurança: a plataforma faz requisições para uma URL escolhida pelo cliente. Para
-limitar o uso disso contra a rede interna, a regra acima barra hosts locais e IPs
-privados digitados direto, e **o corpo da resposta nunca é gravado nem exibido**
-(só o status HTTP ou a classe do erro). O nome do host não é resolvido no cadastro,
-então um domínio público que aponte para IP interno passa; o risco que sobra é de
-requisição às cegas, sem leitura da resposta.
+### Segurança (SSRF)
+
+A plataforma faz requisições para uma URL escolhida pelo cliente, e a tela mostra o
+status HTTP de cada tentativa. Sem proteção, isso permitiria sondar a rede interna do
+servidor (ex.: um domínio público apontando para `10.0.0.5` ou `169.254.169.254`). A
+`App\Services\Webhook\WebhookDestination` confere o destino **no cadastro e de novo a
+cada envio** (o DNS pode mudar depois do cadastro). Fora do ambiente `local`:
+
+1. Exige `https`.
+2. Recusa `localhost`, nomes sem domínio de topo alfabético (`intranet`) e IPs
+   disfarçados (`2130706433`, `127.1`), que o curl aceitaria como `127.0.0.1`.
+3. Resolve o DNS (IPv4 e IPv6, `WebhookHostResolver`) e recusa se o domínio não
+   resolver ou se **qualquer** IP for privado ou reservado (inclui loopback,
+   `169.254.x` e `::1`). IP digitado direto passa pela mesma checagem.
+4. Trava a conexão no IP conferido (`CURLOPT_RESOLVE`), para o DNS não trocar entre a
+   conferência e o `POST` (DNS rebinding).
+
+Destino recusado no envio vira tentativa com falha (`Destino recusado: ...`), sem
+requisição. Além disso, **o corpo da resposta nunca é gravado nem exibido**, e erros de
+conexão aparecem só como categoria ("Tempo esgotado" ou "Falha de conexão"); a mensagem
+crua do curl vai para o log.
 
 ### Implementação interna
 
@@ -466,8 +481,12 @@ lacrado.
     15 min, 1 h e 3 h; desiste após a 6ª tentativa sem marcar o job como falho;
     usa a URL atual; para se a URL for removida ou o envelope não existir mais
   - `WebhookUrl`: aceita `https` público; recusa `http`, `localhost`, IPs privados
-    e reservados, IPv6 de loopback, IP em forma decimal e nome sem domínio de
-    topo; em `local` aceita `http://localhost`
+    e reservados, IPv6 de loopback, IP em forma decimal, nome sem domínio de
+    topo, domínio que resolve para IP interno (mesmo que só um dos IPs) e domínio
+    que não resolve; em `local` aceita `http://localhost`
+  - `WebhookSender` (SSRF): trava a conexão no IP conferido (`CURLOPT_RESOLVE`);
+    não envia se o domínio passou a resolver para IP interno depois do cadastro;
+    erro de conexão gravado só como categoria
   - Tela "Integração": `404` sem token; menu só com token; salvar gera o segredo
     uma vez; URL vazia desativa; URL inválida recusada; novo segredo; envio de
     teste assinado (sucesso e falha); só as entregas da própria conta

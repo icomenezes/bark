@@ -9,13 +9,54 @@ use App\Services\Webhook\WebhookSender;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Tests\Concerns\FakesWebhookDns;
 use Tests\TestCase;
 
 class WebhookSenderTest extends TestCase
 {
-    use RefreshDatabase;
+    use FakesWebhookDns, RefreshDatabase;
 
     private const URL = 'https://ponto.example.com/webhooks/assinador';
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->fakeWebhookDns([
+            'ponto.example.com' => ['93.184.216.34'],
+            'outro.example.com' => ['93.184.216.35'],
+        ]);
+    }
+
+    public function test_pins_the_connection_to_the_checked_ip(): void
+    {
+        $options = null;
+        Http::fake(function ($request, $requestOptions) use (&$options) {
+            $options = $requestOptions;
+
+            return Http::response('', 200);
+        });
+
+        app(WebhookSender::class)->send($this->userWithWebhook(), 'evt-1', 'envelope.signed', $this->body(), null, attempt: 1);
+
+        // Sem a trava, o curl resolveria o DNS de novo e poderia cair em outro IP.
+        $this->assertSame(['ponto.example.com:443:93.184.216.34'], $options['curl'][CURLOPT_RESOLVE] ?? null);
+    }
+
+    public function test_refuses_to_send_when_the_domain_now_resolves_to_an_internal_address(): void
+    {
+        // Cadastrada com IP público, a URL passou a apontar para a rede interna depois.
+        Http::fake();
+        $user = $this->userWithWebhook();
+        $this->fakeWebhookDns(['ponto.example.com' => ['10.0.0.5']]);
+
+        $delivery = app(WebhookSender::class)->send($user, 'evt-1', 'envelope.signed', $this->body(), null, attempt: 1);
+
+        Http::assertNothingSent();
+        $this->assertFalse($delivery->successful());
+        $this->assertNull($delivery->response_status);
+        $this->assertNotNull($delivery->error);
+    }
 
     private function userWithWebhook(): User
     {
@@ -92,7 +133,8 @@ class WebhookSenderTest extends TestCase
 
         $this->assertFalse($delivery->successful());
         $this->assertNull($delivery->response_status);
-        $this->assertNotNull($delivery->error);
+        // Só a categoria: a mensagem crua do curl (que pode revelar a rede) vai para o log, não para a tela.
+        $this->assertSame('Tempo esgotado', $delivery->error);
     }
 
     public function test_redirects_are_not_followed(): void

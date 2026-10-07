@@ -216,7 +216,10 @@ Spec completa (contrato, erros, formato do webhook, exemplo de verificação em 
   não é erro nosso. URL/segredo lidos a cada tentativa
 - `webhook_deliveries` — uma linha por tentativa; **fora de `envelope_events`** de propósito (aquela
   trilha vai inteira para o certificado de evidências). `model:prune` diário apaga após 90 dias
-- `App\Rules\WebhookUrl` — fora de `local`: só `https`, sem `localhost`/IP privado/IP decimal
+- **SSRF**: `WebhookDestination` confere o destino no cadastro (`App\Rules\WebhookUrl`) **e a cada envio**:
+  fora de `local`, só `https`, resolve o DNS (`WebhookHostResolver`, trocado por falso nos testes via
+  `Tests\Concerns\FakesWebhookDns`) e recusa se qualquer IP for privado/reservado; o envio trava no IP
+  conferido com `CURLOPT_RESOLVE` (anti DNS rebinding). Erro de conexão na tela é só categoria
 
 ---
 

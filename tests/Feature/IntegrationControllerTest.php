@@ -8,13 +8,35 @@ use App\Models\WebhookDelivery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Tests\Concerns\FakesWebhookDns;
 use Tests\TestCase;
 
 class IntegrationControllerTest extends TestCase
 {
-    use RefreshDatabase;
+    use FakesWebhookDns, RefreshDatabase;
 
     private const URL = 'https://ponto.example.com/webhooks/assinador';
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->fakeWebhookDns([
+            'ponto.example.com' => ['93.184.216.34'],
+            'outro.example.com' => ['93.184.216.35'],
+        ]);
+    }
+
+    public function test_rejects_a_domain_that_resolves_to_an_internal_address(): void
+    {
+        $this->fakeWebhookDns(['interno.example.com' => ['192.168.0.10']]);
+        $user = $this->apiClient();
+
+        $this->actingAs($user)->patch('/integration', ['webhook_url' => 'https://interno.example.com/hook'])
+            ->assertSessionHasErrors('webhook_url');
+
+        $this->assertNull($user->fresh()->webhook_url);
+    }
 
     private function apiClient(array $attributes = []): User
     {

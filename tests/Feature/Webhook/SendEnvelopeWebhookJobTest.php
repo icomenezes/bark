@@ -11,13 +11,24 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Tests\Concerns\FakesWebhookDns;
 use Tests\TestCase;
 
 class SendEnvelopeWebhookJobTest extends TestCase
 {
-    use RefreshDatabase;
+    use FakesWebhookDns, RefreshDatabase;
 
     private const URL = 'https://ponto.example.com/webhooks/assinador';
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->fakeWebhookDns([
+            'ponto.example.com' => ['93.184.216.34'],
+            'novo.example.com' => ['93.184.216.35'],
+        ]);
+    }
 
     private function apiEnvelope(array $attributes = []): Envelope
     {
