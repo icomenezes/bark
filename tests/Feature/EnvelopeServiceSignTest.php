@@ -8,8 +8,10 @@ use App\Mail\Envelopes\EnvelopeDeclined;
 use App\Mail\Envelopes\EnvelopeOtp;
 use App\Models\Envelope;
 use App\Models\EnvelopeSigner;
+use App\Models\Setting;
 use App\Services\Envelope\EnvelopeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -130,5 +132,30 @@ class EnvelopeServiceSignTest extends TestCase
         $this->assertSame('cancelled', $envelope->fresh()->status);
         Mail::assertSent(EnvelopeCancelled::class, 1);
         Mail::assertSent(EnvelopeCancelled::class, fn ($m) => $m->hasTo('a@x.com'));
+    }
+
+    public function test_cancel_notifies_whatsapp_signers_over_whatsapp(): void
+    {
+        Mail::fake();
+        Http::fake();
+        config(['services.evolution.url' => 'https://evo.test', 'services.evolution.instance' => 'i', 'services.evolution.key' => 'k']);
+        Setting::current()->update(['whatsapp_enabled' => true]);
+        Setting::clearCache();
+        $envelope = Envelope::factory()->create(['status' => 'sent', 'title' => 'Folha de ponto 09/2026']);
+        EnvelopeSigner::factory()->for($envelope)->create([
+            'channel' => 'whatsapp', 'email' => null, 'whatsapp' => '11999998888', 'status' => 'notified',
+        ]);
+        EnvelopeSigner::factory()->for($envelope)->create([
+            'channel' => 'whatsapp', 'email' => null, 'whatsapp' => '11977776666', 'status' => 'pending',
+        ]);
+
+        app(EnvelopeService::class)->cancel($envelope);
+
+        Mail::assertNothingSent();
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/message/sendText/')
+            && str_contains($request['number'], '11999998888')
+            && str_contains($request['text'], 'Folha de ponto 09/2026')
+            && str_contains($request['text'], 'cancelado'));
     }
 }

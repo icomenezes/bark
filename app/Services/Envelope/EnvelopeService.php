@@ -255,7 +255,14 @@ class EnvelopeService
         $this->recordEvent($envelope, null, 'cancelled');
 
         foreach ($envelope->signers()->where('status', '!=', 'pending')->get() as $signer) {
-            Mail::to($signer->email)->send(new EnvelopeCancelled($envelope));
+            if ($signer->channel === 'whatsapp') {
+                $this->notification->sendWhatsAppTo($signer->whatsapp,
+                    "🚫 O documento *{$envelope->title}* enviado por *{$envelope->user->name}* foi cancelado.\n".
+                    'O link de assinatura que você recebeu não é mais válido.'
+                );
+            } else {
+                Mail::to($signer->email)->send(new EnvelopeCancelled($envelope));
+            }
         }
     }
 
