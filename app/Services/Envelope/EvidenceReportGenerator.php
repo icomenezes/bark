@@ -261,19 +261,22 @@ class EvidenceReportGenerator
         $qrSize = 72;
         $qrX = $pdf->getPageWidth() - $left - $qrSize;
 
+        $textWidth = $qrX - $left - 10;
+
         $qrUrl = rtrim(config('app.url'), '/')."/verificar/{$this->currentVerificationCode}";
         $pdf->write2DBarcode($qrUrl, 'QRCODE,H', $qrX, $y, $qrSize, $qrSize, [], 'N');
 
+        // MultiCell, não Cell: Cell não quebra nem corta, e um título longo passava por cima do QR.
         $pdf->SetXY($left, $y + 14);
         $pdf->SetFont('helvetica', '', 15);
-        $pdf->Cell($qrX - $left - 10, 20, $envelope->title, 0, 1);
-        $pdf->SetX($left);
+        $pdf->MultiCell($textWidth, 20, $envelope->title, 0, 'L', false, 1, $left);
         $pdf->SetFont('helvetica', '', 8.5);
         $pdf->SetTextColor(102, 102, 102);
-        $pdf->Cell($qrX - $left - 10, 12, 'Código do documento '.$envelope->verification_code, 0, 1);
+        $pdf->MultiCell($textWidth, 12, 'Código do documento '.$envelope->verification_code, 0, 'L', false, 1, $left);
         $pdf->SetTextColor(0, 0, 0);
 
-        $pdf->SetY($y + $qrSize + 14);
+        // Título de várias linhas pode descer abaixo do QR: o bloco termina no que for mais baixo.
+        $pdf->SetY(max($y + $qrSize, $pdf->GetY()) + 14);
         $this->divider($pdf);
         $pdf->SetY($pdf->GetY() + 18);
     }

@@ -70,6 +70,49 @@ class EvidenceReportGeneratorTest extends TestCase
         @unlink($result);
     }
 
+    public function test_long_title_wraps_instead_of_running_under_the_qr_code(): void
+    {
+        Storage::fake('documents');
+        $title = 'F. Ponto - 01/09/2026 a 30/09/2026 - 0005021 - CLAUDIA DOS SANTOS BARBOZA';
+        $envelope = Envelope::factory()->create([
+            'title' => $title,
+            'verification_code' => '66666666-6666-6666-6666-666666666666',
+        ]);
+
+        $path = (new EvidenceReportGenerator)->generate($envelope->fresh(['signers', 'events']));
+        $runs = $this->textRuns($path);
+        @unlink($path);
+
+        // Cada linha desenhada vira um trecho de texto no PDF: o título inteiro em um
+        // trecho só significa que ele ultrapassou a coluna e invadiu o QR.
+        $titleLines = array_values(array_filter(
+            array_map('trim', $runs),
+            fn (string $run) => strlen($run) > 10 && str_contains($title, $run),
+        ));
+        $this->assertGreaterThanOrEqual(2, count($titleLines), 'O título longo deveria quebrar em mais de uma linha.');
+        $this->assertSame($title, implode(' ', $titleLines));
+    }
+
+    /** Trechos de texto (operadores Tj/TJ) de todos os streams do PDF. */
+    private function textRuns(string $path): array
+    {
+        preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', file_get_contents($path), $streams);
+
+        $runs = [];
+        foreach ($streams[1] as $stream) {
+            $content = @gzuncompress($stream);
+            if ($content === false) {
+                continue;
+            }
+            preg_match_all('/\[\((.*?)\)\]\s*TJ|\((.*?)\)\s*Tj/s', $content, $m);
+            foreach (array_keys($m[0]) as $i) {
+                $runs[] = stripcslashes($m[1][$i] !== '' ? $m[1][$i] : $m[2][$i]);
+            }
+        }
+
+        return $runs;
+    }
+
     public function test_uses_settings_primary_color_for_border(): void
     {
         Storage::fake('documents');
