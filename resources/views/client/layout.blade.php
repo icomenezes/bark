@@ -24,6 +24,9 @@
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen flex flex-col">
 
+    {{-- "Integração" só existe para contas com token de API (o webhook vale só para envelopes da API). --}}
+    @php($hasApiToken = auth()->user()->tokens()->exists())
+
     <div x-data="{ mobileNavOpen: false }">
     <header class="bg-gray-900 border-b border-gray-800 px-6 py-4 flex items-center gap-4">
         <div class="flex items-center gap-3">
@@ -63,6 +66,13 @@
                       {{ request()->routeIs('signers.*') ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800' }}">
                 Signatários
             </a>
+            @if ($hasApiToken)
+                <a href="{{ route('integration.edit') }}"
+                   class="px-3 py-2 rounded-md text-sm transition-colors
+                          {{ request()->routeIs('integration.*') ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800' }}">
+                    Integração
+                </a>
+            @endif
         </nav>
 
         <div class="ml-auto flex items-center gap-3">
@@ -120,6 +130,13 @@
                       {{ request()->routeIs('signers.*') ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800' }}">
                 Signatários
             </a>
+            @if ($hasApiToken)
+                <a href="{{ route('integration.edit') }}"
+                   class="block px-3 py-2 rounded-md text-sm transition-colors
+                          {{ request()->routeIs('integration.*') ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800' }}">
+                    Integração
+                </a>
+            @endif
             <a href="{{ route('profile.edit') }}"
                class="block px-3 py-2 rounded-md text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
                 {{ auth()->user()->name }}

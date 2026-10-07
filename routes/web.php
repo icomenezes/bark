@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Client\CertificateController;
 use App\Http\Controllers\Client\DashboardController;
 use App\Http\Controllers\Client\EnvelopeController;
+use App\Http\Controllers\Client\IntegrationController;
 use App\Http\Controllers\Client\SignDocumentController;
 use App\Http\Controllers\HeartbeatController;
 use App\Http\Controllers\ProfileController;
@@ -74,6 +75,12 @@ Route::middleware('auth')->group(function () {
     Route::get('signatarios/grupos/{signerGroup}/editar', [\App\Http\Controllers\Client\SignerDirectoryController::class, 'editGroup'])->name('signers.groups.edit');
     Route::patch('signatarios/grupos/{signerGroup}', [\App\Http\Controllers\Client\SignerDirectoryController::class, 'updateGroup'])->name('signers.groups.update');
     Route::delete('signatarios/grupos/{signerGroup}', [\App\Http\Controllers\Client\SignerDirectoryController::class, 'destroyGroup'])->name('signers.groups.destroy');
+
+    // Integração (webhook dos envelopes criados pela API)
+    Route::get('integration', [IntegrationController::class, 'edit'])->name('integration.edit');
+    Route::patch('integration', [IntegrationController::class, 'update'])->name('integration.update');
+    Route::post('integration/secret', [IntegrationController::class, 'regenerateSecret'])->name('integration.secret');
+    Route::post('integration/test', [IntegrationController::class, 'test'])->name('integration.test');
 });
 
 // Cadastro público — recebe leads de site externo

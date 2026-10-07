@@ -3,15 +3,16 @@
 namespace Tests\Feature;
 
 use App\Jobs\SealEnvelopeJob;
+use App\Jobs\SendEnvelopeWebhookJob;
 use App\Mail\Envelopes\EnvelopeCompleted;
 use App\Models\Envelope;
 use App\Models\EnvelopeSigner;
 use App\Models\Setting;
 use App\Models\User;
-use App\Services\NotificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Tests\Concerns\GeneratesPfx;
 use Tests\TestCase;
@@ -85,6 +86,30 @@ class SealEnvelopeJobTest extends TestCase
         return $envelope->fresh();
     }
 
+    /** Roda o job resolvendo as dependências do handle() pelo container. */
+    private function seal(Envelope $envelope): void
+    {
+        app()->call([new SealEnvelopeJob($envelope), 'handle']);
+    }
+
+    public function test_sealing_an_api_envelope_dispatches_the_signed_webhook(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        Mail::fake();
+        Queue::fake([SendEnvelopeWebhookJob::class]);
+        $this->configureRealPlatformCertificate();
+        $owner = User::factory()->create(['webhook_url' => 'https://ponto.example.com/hook']);
+        $envelope = $this->makeSignedEnvelope($owner);
+        $envelope->update(['source' => 'api']);
+
+        $this->seal($envelope);
+
+        $this->assertSame('completed', $envelope->fresh()->status);
+        Queue::assertPushed(SendEnvelopeWebhookJob::class, fn ($job) => $job->envelopeId === $envelope->id
+            && $job->event === 'envelope.signed');
+    }
+
     public function test_seals_envelope_end_to_end(): void
     {
         Storage::fake('local');
@@ -93,12 +118,7 @@ class SealEnvelopeJobTest extends TestCase
         $this->configureRealPlatformCertificate();
         $envelope = $this->makeSignedEnvelope();
 
-        (new SealEnvelopeJob($envelope))->handle(
-            app(\App\Services\Envelope\EvidenceReportGenerator::class),
-            app(\App\Services\Envelope\EnvelopePdfComposer::class),
-            app(\App\Services\Envelope\EnvelopeService::class),
-            app(NotificationService::class),
-        );
+        $this->seal($envelope);
 
         $envelope->refresh();
         $this->assertSame('completed', $envelope->status);
@@ -123,12 +143,7 @@ class SealEnvelopeJobTest extends TestCase
         $envelope = $this->makeSignedEnvelope();
 
         try {
-            (new SealEnvelopeJob($envelope))->handle(
-                app(\App\Services\Envelope\EvidenceReportGenerator::class),
-                app(\App\Services\Envelope\EnvelopePdfComposer::class),
-                app(\App\Services\Envelope\EnvelopeService::class),
-                app(NotificationService::class),
-            );
+            $this->seal($envelope);
             $this->fail('Deveria ter lançado exceção');
         } catch (\Throwable) {
             // esperado
@@ -150,12 +165,7 @@ class SealEnvelopeJobTest extends TestCase
         $this->configureOwnersOwnCertificate($owner);
         $envelope = $this->makeSignedEnvelope($owner);
 
-        (new SealEnvelopeJob($envelope))->handle(
-            app(\App\Services\Envelope\EvidenceReportGenerator::class),
-            app(\App\Services\Envelope\EnvelopePdfComposer::class),
-            app(\App\Services\Envelope\EnvelopeService::class),
-            app(NotificationService::class),
-        );
+        $this->seal($envelope);
 
         $envelope->refresh();
         $this->assertSame('completed', $envelope->status);
@@ -171,12 +181,7 @@ class SealEnvelopeJobTest extends TestCase
         $envelope = $this->makeSignedEnvelope();
         $envelope->signers()->update(['send_signed_copy' => false]);
 
-        (new SealEnvelopeJob($envelope))->handle(
-            app(\App\Services\Envelope\EvidenceReportGenerator::class),
-            app(\App\Services\Envelope\EnvelopePdfComposer::class),
-            app(\App\Services\Envelope\EnvelopeService::class),
-            app(NotificationService::class),
-        );
+        $this->seal($envelope);
 
         // só o remetente recebe — o único signatário tem send_signed_copy=false
         Mail::assertSent(EnvelopeCompleted::class, 1);

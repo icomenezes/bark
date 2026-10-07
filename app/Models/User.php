@@ -17,9 +17,10 @@ class User extends Authenticatable
     protected $fillable = [
         'name', 'email', 'password', 'role', 'whatsapp', 'plan_id',
         'signing_certificate_id', 'whatsapp_envelope_enabled', 'default_envelope_channel',
+        'webhook_url',
     ];
 
-    protected $hidden = ['password', 'remember_token'];
+    protected $hidden = ['password', 'remember_token', 'webhook_secret'];
 
     protected function casts(): array
     {
@@ -27,6 +28,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'whatsapp_envelope_enabled' => 'boolean',
+            'webhook_secret' => 'encrypted',
         ];
     }
 
@@ -92,6 +94,13 @@ class User extends Authenticatable
     public function plan()
     {
         return $this->belongsTo(Plan::class);
+    }
+
+    // ── Webhook (envelopes da API) ───────────────────────────────────────────
+
+    public function webhookDeliveries(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(WebhookDelivery::class);
     }
 
     // ── Redefinição de senha ─────────────────────────────────────────────────

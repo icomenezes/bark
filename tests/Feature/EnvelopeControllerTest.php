@@ -54,6 +54,7 @@ class EnvelopeControllerTest extends TestCase
         $response->assertRedirect(route('envelopes.show', $envelope));
         $this->assertSame('sent', $envelope->status);
         $this->assertSame($user->id, $envelope->user_id);
+        $this->assertSame('web', $envelope->source);
     }
 
     public function test_store_validates_signers_json(): void

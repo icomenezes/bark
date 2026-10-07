@@ -103,6 +103,7 @@ Alias `admin` registrado em `bootstrap/app.php`. Login redireciona admin → `ad
 - `/sign-document` — assinar PDF (preview PDF.js + marcador); POST `sign` / `generate`; GET `download/{file}`
 - `POST /heartbeat` — atualiza `active_sessions.last_seen_at`
 - `POST /api/register` — registro público de leads (sem CSRF)
+- `/integration` — webhook dos envelopes da API (URL, segredo, teste, últimas entregas); só para contas com token de API
 - `/profile` — perfil Breeze
 
 ---
@@ -193,6 +194,29 @@ plataforma. Spec: `docs/superpowers/specs/2026-07-15-envelopes-assinatura-eletro
   modificado uma única vez, no lacre
 - Recusa de qualquer signatário encerra o envelope inteiro
 - Command `envelopes:expire` (agendado de hora em hora em `routes/console.php`) expira envelopes `sent` vencidos
+
+---
+
+## API v1 e webhooks (integrações externas)
+
+Spec completa (contrato, erros, formato do webhook, exemplo de verificação em PHP):
+`docs/superpowers/specs/2026-07-16-api-envelopes-integracao-externa-design.md`.
+
+- Token Sanctum gerado só pelo admin (`/admin/users/{id}/edit`); rotas em `routes/api.php`
+  (`POST envelopes`, `GET envelopes/{id}`, `POST envelopes/{id}/cancel`, `POST sign-document`)
+- `App\Support\EnvelopeApiPayload` — status mapeado (`sent` → `pending`, `completed` → `signed`) e corpo
+  do GET; o webhook reaproveita o mesmo corpo, então os dois nunca divergem
+- `envelopes.source` (`web` | `api`): a API grava `api`. **Só envelopes `api` disparam webhook**
+- Webhooks `envelope.signed` (lacre concluído) e `envelope.cancelled`: `EnvelopeWebhook::dispatch()` é
+  chamado no `SealEnvelopeJob` e no `EnvelopeService::cancel()`, **antes** das notificações (se uma
+  delas falhar, o webhook já saiu). Enfileira `SendEnvelopeWebhookJob` só se a conta tem `users.webhook_url`
+- `WebhookSender` — uma tentativa: HMAC `sha256` de `"{timestamp}.{corpo}"` com `users.webhook_secret`
+  (cast `encrypted`), timeout 10 s, sem seguir redirect, **nunca grava o corpo da resposta** (URL é do cliente)
+- Job tenta 6 vezes (1 min, 5 min, 15 min, 1 h, 3 h) com `release()`, não exceção: falha do receptor
+  não é erro nosso. URL/segredo lidos a cada tentativa
+- `webhook_deliveries` — uma linha por tentativa; **fora de `envelope_events`** de propósito (aquela
+  trilha vai inteira para o certificado de evidências). `model:prune` diário apaga após 90 dias
+- `App\Rules\WebhookUrl` — fora de `local`: só `https`, sem `localhost`/IP privado/IP decimal
 
 ---
 

@@ -1,6 +1,6 @@
 # API de Envelopes — Integração Externa (Delphi/outros sistemas)
 
-Data: 2026-07-16 (atualizado em 2026-07-20 — ver nota de atualização abaixo)
+Data: 2026-07-16 (atualizado em 2026-07-20 e 2026-10-07 — ver notas de atualização abaixo)
 
 > **Atualização 2026-07-20:** `POST /api/v1/envelopes` passou a aceitar o campo
 > opcional `send_signed_copy` (ver seção do payload abaixo). Também foi
@@ -14,6 +14,10 @@ Data: 2026-07-16 (atualizado em 2026-07-20 — ver nota de atualização abaixo)
 > (ver seção própria abaixo). Consumidor inicial: sistema Ponto, que cancela o
 > envelope anterior de uma folha de ponto antes de reenviá-la, para o funcionário
 > não ficar com dois links válidos.
+>
+> **Atualização 2026-10-07 (webhooks):** a plataforma passa a avisar o sistema do
+> cliente por `POST` quando um envelope criado pela API termina assinado ou
+> cancelado (ver seção "Webhooks").
 
 ## Contexto
 
@@ -227,10 +231,197 @@ documento anterior foi (ou está sendo) assinado e o reenvio deve ser abortado.
 | Certificado da plataforma ausente/vencido (falha no `send()`) | `422` | `{"message": "<mensagem do RuntimeException>"}` |
 | Envelope de outro usuário ou inexistente no GET | `404` | `{"message": "Not Found."}` |
 
+## Webhooks
+
+Adicionado em 2026-10-07. A plataforma avisa o sistema do cliente com um `POST` em
+uma URL cadastrada por ele, quando um envelope criado pela API termina assinado ou
+cancelado. Com isso o integrador não precisa ficar consultando o GET. A URL e o
+segredo de assinatura são cadastrados pelo próprio cliente, na área dele.
+
+### Quando dispara
+
+| Evento | Quando | `status` no corpo |
+|---|---|---|
+| `envelope.signed` | O lacre terminou (`SealEnvelopeJob` gravou `completed`) e o PDF final já está disponível | `signed` |
+| `envelope.cancelled` | O envelope foi cancelado (`EnvelopeService::cancel()`), pela tela web ou pela API | `cancelled` |
+
+Só dispara quando o envelope foi criado pela API (`envelopes.source = api`) **e** a
+conta do dono tem `webhook_url` cadastrada.
+
+Não dispara para:
+
+- envelopes criados pela tela web;
+- envelopes criados **antes** da implantação dos webhooks, que ficam com
+  `source = web` (para esses, o integrador continua usando o GET);
+- recusa (`declined`), expiração (`expired`), visualização ou assinatura de um
+  signatário antes do lacre (ver "Fora de escopo").
+
+Se o lacre falhar (`seal_failed`), o `envelope.signed` só sai quando um
+reprocessamento concluir o lacre. Um cancelamento feito pelo próprio integrador via
+`POST /api/v1/envelopes/{id}/cancel` também gera `envelope.cancelled` para ele.
+
+### O `POST` enviado
+
+```http
+POST https://ponto.exemplo.com.br/webhooks/assinador
+Content-Type: application/json
+X-Webhook-Event: envelope.signed
+X-Webhook-Id: 9b2f6c1e-4d7a-4f3b-9a51-0c8e2d6f7a10
+X-Webhook-Timestamp: 1791394330
+X-Webhook-Signature: sha256=3f1c9a...e07b
+
+{
+  "id": "9b2f6c1e-4d7a-4f3b-9a51-0c8e2d6f7a10",
+  "event": "envelope.signed",
+  "occurred_at": "2026-10-07T14:32:10-03:00",
+  "envelope": {
+    "id": 42,
+    "status": "signed",
+    "created_at": "2026-10-07T14:20:00-03:00",
+    "signed_at": "2026-10-07T14:32:10-03:00",
+    "download_url": "https://<bucket>.s3.../final.pdf?X-Amz-Signature=..."
+  }
+}
+```
+
+Para `envelope.cancelled`, o corpo tem o mesmo formato, com
+`"event": "envelope.cancelled"`, `"status": "cancelled"`, `"signed_at": null` e
+`"download_url": null`.
+
+Campos:
+
+- `id`: identificador da notificação (UUID). É **o mesmo em todas as tentativas**
+  da mesma notificação; o receptor usa para descartar repetições. Repetido no
+  cabeçalho `X-Webhook-Id`.
+- `event`: `envelope.signed` ou `envelope.cancelled`. Repetido no cabeçalho
+  `X-Webhook-Event`. O botão "Enviar teste" da tela do cliente manda `test`, com
+  `"envelope": null`.
+- `occurred_at`: quando o status mudou. Não muda entre tentativas.
+- `envelope`: **exatamente** o corpo do `GET /api/v1/envelopes/{id}` (mesmo código
+  monta os dois). O `download_url` é gerado a cada tentativa e vale 5 minutos a
+  partir dela. Se expirar, o GET gera um novo.
+
+### Verificando a assinatura
+
+Cada tentativa leva `X-Webhook-Timestamp` (Unix, segundos, da própria tentativa) e
+`X-Webhook-Signature` = `sha256=` + HMAC-SHA256 em hexadecimal de
+`"{timestamp}.{corpo bruto}"`, com o segredo da conta como chave. O receptor
+recalcula sobre o corpo **bruto** (antes de decodificar o JSON), compara em tempo
+constante e recusa timestamps com mais de 5 minutos de diferença, o que barra
+reenvio de uma requisição capturada.
+
+Exemplo em PHP (receptor do Ponto):
+
+```php
+$body = file_get_contents('php://input');
+$timestamp = $_SERVER['HTTP_X_WEBHOOK_TIMESTAMP'] ?? '';
+$signature = $_SERVER['HTTP_X_WEBHOOK_SIGNATURE'] ?? '';
+
+$expected = 'sha256='.hash_hmac('sha256', $timestamp.'.'.$body, $segredo);
+
+if (! hash_equals($expected, $signature) || abs(time() - (int) $timestamp) > 300) {
+    http_response_code(401);
+    exit;
+}
+
+$notificacao = json_decode($body, true);
+// Já processou $notificacao['id']? Responde 200 e ignora.
+```
+
+### Entrega e novas tentativas
+
+- **Sucesso:** qualquer resposta `2xx` em até **10 segundos**. O corpo da resposta
+  é ignorado.
+- **Redirecionamento** (`3xx`) não é seguido e conta como falha.
+- **Falha** (timeout, erro de conexão, qualquer status fora de `2xx`): nova
+  tentativa. São **6 tentativas no total**, com intervalos de 1 min, 5 min, 15 min,
+  1 h e 3 h (cerca de 4h20 entre a primeira e a última). Depois da última, a
+  plataforma desiste; o GET continua respondendo normalmente.
+- Cada tentativa usa a URL e o segredo **atuais** da conta. Corrigir uma URL
+  quebrada faz as tentativas seguintes irem para a nova; remover a URL interrompe
+  as tentativas pendentes.
+- A ordem entre notificações não é garantida. Os dois eventos são finais, então
+  isso não afeta o integrador.
+
+O receptor deve:
+
+1. verificar a assinatura;
+2. responder `2xx` rápido e deixar processamento pesado (ex.: baixar o PDF) para
+   depois, se puder demorar mais que 10 segundos;
+3. descartar `id` já processado: a mesma notificação pode chegar mais de uma vez
+   (ex.: o receptor processou, mas a resposta não chegou a tempo);
+4. ignorar envelopes que não conhece.
+
+### Cadastro pelo cliente (tela "Integração")
+
+- Item **"Integração"** no menu do cliente, visível só para contas com token de API
+  ativo (o webhook só vale para envelopes da API). Sem token, a rota responde `404`.
+- Rotas (middleware `auth`, escopo do próprio usuário):
+  - `GET /integration` (`integration.edit`)
+  - `PATCH /integration` (`integration.update`)
+  - `POST /integration/secret` (`integration.secret`)
+  - `POST /integration/test` (`integration.test`)
+- **URL**: campo único; salvar vazio desativa os webhooks. Regra `App\Rules\WebhookUrl`:
+  URL `http(s)` de até 2048 caracteres. Fora do ambiente `local`, só `https`, e o host
+  não pode ser `localhost` nem IP literal de rede privada ou reservada. Em `local`
+  aceita `http` e `localhost`, para o integrador testar na própria máquina.
+- **Segredo**: gerado automaticamente (`whsec_` + 40 caracteres aleatórios) quando a
+  URL é salva pela primeira vez, e exibido na tela para copiar. O botão
+  "Gerar novo segredo" troca na hora; tentativas pendentes já saem assinadas com o
+  novo, então o integrador precisa atualizar o dele em seguida.
+- **"Enviar teste"**: faz na hora um `POST` assinado do mesmo jeito, com
+  `"event": "test"` e `"envelope": null`, em uma tentativa só, e mostra o resultado
+  (status HTTP ou erro). Fica registrado nas entregas, sem envelope.
+- **Últimas entregas**: as 20 tentativas mais recentes da conta, com data e hora,
+  evento, envelope, número da tentativa e resultado.
+
+Segurança: a plataforma faz requisições para uma URL escolhida pelo cliente. Para
+limitar o uso disso contra a rede interna, a regra acima barra hosts locais e IPs
+privados digitados direto, e **o corpo da resposta nunca é gravado nem exibido**
+(só o status HTTP ou a classe do erro). O nome do host não é resolvido no cadastro,
+então um domínio público que aponte para IP interno passa; o risco que sobra é de
+requisição às cegas, sem leitura da resposta.
+
+### Implementação interna
+
+Dados:
+
+- `envelopes.source` (`web` | `api`, padrão `web`): gravado como `api` pelo
+  `POST /api/v1/envelopes`. Envelopes anteriores ficam `web`, porque não há como
+  saber quais vieram da API.
+- `users.webhook_url` (nullable) e `users.webhook_secret` (cast `encrypted`): uma
+  URL por conta.
+- Tabela `webhook_deliveries`: uma linha por tentativa, com `user_id`,
+  `envelope_id`, `event_id` (o `id` da notificação), `event`, `url` (cópia da URL
+  usada), `attempt`, `response_status` e `error`. O corpo da resposta **nunca** é
+  gravado. Linhas com mais de 90 dias são apagadas pelo `model:prune`, agendado em
+  `routes/console.php`. **Não** usa `envelope_events`: o
+  `EvidenceReportGenerator` imprime todos os eventos no certificado de evidências.
+
+Fluxo:
+
+1. O status muda em um dos dois pontos: `SealEnvelopeJob`, logo após gravar
+   `completed`, ou `EnvelopeService::cancel()`.
+2. Esse ponto chama `EnvelopeWebhook::dispatch($envelope, $event)`.
+3. Se `source = api` e o dono tem `webhook_url`, o serviço gera o `id` da
+   notificação e o `occurred_at` e enfileira o `SendEnvelopeWebhookJob`. Se não,
+   não faz nada.
+4. O job monta o corpo, assina e envia a cada tentativa (`WebhookSender`, o mesmo
+   usado pelo botão de teste) e registra o resultado em `webhook_deliveries`. Em
+   falha, devolve o job à fila (`release`) com o próximo intervalo, sem lançar
+   exceção: falha do receptor não é erro da plataforma e não deve sujar o log.
+
+Não sai webhook duplicado em repetições: cancelar de novo pela API devolve `200`
+sem chamar `cancel()`, e o `SealEnvelopeJob` não refaz o lacre de envelope já
+lacrado.
+
 ## Fora de escopo (decidido explicitamente)
 
-- **Webhook de notificação de assinatura** — só polling via GET por enquanto,
-  conforme pedido
+- **Webhook para outros eventos**: só `envelope.signed` e `envelope.cancelled`.
+  Recusa, expiração, visualização e assinatura individual continuam só pelo GET.
+  Webhooks para envelopes criados pela tela web também ficam de fora. (A versão
+  original desta spec deixava qualquer webhook de fora, só polling; os dois
+  eventos foram adicionados em 2026-10-07.)
 - **Múltiplos signatários via API** — sempre 1 signatário por chamada; para
   múltiplos, o cliente deve usar o formulário web
 - **OTP (e-mail/WhatsApp) como autenticação do signatário via API** — sempre
@@ -264,3 +455,21 @@ documento anterior foi (ou está sendo) assinado e o reenvio deve ser abortado.
   `cancelled` → `200` sem evento novo nem e-mail; `sent` com todos assinados →
   `422` e continua `sent`; `completed` → `422` com `"status": "signed"`;
   `declined` → `422` com `"status": "declined"`
+- Testes (adicionados 2026-10-07), webhooks:
+  - `source`: envelope criado pela API grava `api`; pela tela web, `web`
+  - `EnvelopeWebhook`: enfileira só para envelope `api` de conta com URL; o
+    `cancel()` dispara `envelope.cancelled` e o lacre dispara `envelope.signed`
+  - `WebhookSender`: corpo JSON e cabeçalhos com assinatura HMAC conferível;
+    resposta fora de `2xx` e falha de conexão registradas como falha, sem o corpo
+    da resposta; redirecionamento não seguido
+  - `SendEnvelopeWebhookJob`: corpo igual ao do GET; intervalos de 1 min, 5 min,
+    15 min, 1 h e 3 h; desiste após a 6ª tentativa sem marcar o job como falho;
+    usa a URL atual; para se a URL for removida ou o envelope não existir mais
+  - `WebhookUrl`: aceita `https` público; recusa `http`, `localhost`, IPs privados
+    e reservados, IPv6 de loopback, IP em forma decimal e nome sem domínio de
+    topo; em `local` aceita `http://localhost`
+  - Tela "Integração": `404` sem token; menu só com token; salvar gera o segredo
+    uma vez; URL vazia desativa; URL inválida recusada; novo segredo; envio de
+    teste assinado (sucesso e falha); só as entregas da própria conta
+  - Limpeza: linhas com mais de 90 dias são `prunable`; `model:prune` agendado
+    diariamente

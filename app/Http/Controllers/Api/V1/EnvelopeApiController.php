@@ -7,23 +7,14 @@ use App\Models\Envelope;
 use App\Rules\Cpf as CpfRule;
 use App\Services\Envelope\EnvelopeService;
 use App\Services\UsageLimitService;
+use App\Support\EnvelopeApiPayload;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use setasign\Fpdi\Tcpdf\Fpdi;
 
 class EnvelopeApiController extends Controller
 {
-    private const STATUS_MAP = [
-        'draft' => 'draft',
-        'sent' => 'pending',
-        'completed' => 'signed',
-        'declined' => 'declined',
-        'cancelled' => 'cancelled',
-        'expired' => 'expired',
-    ];
-
     public function __construct(
         private EnvelopeService $envelopes,
         private UsageLimitService $usageLimit,
@@ -81,6 +72,7 @@ class EnvelopeApiController extends Controller
                 'title' => $request->input('title'),
                 'message' => $request->input('message'),
                 'signing_order' => 'parallel',
+                'source' => 'api',
                 'signers' => [
                     [
                         'name' => $request->input('signer_name'),
@@ -108,7 +100,7 @@ class EnvelopeApiController extends Controller
 
         return response()->json([
             'id' => $envelope->id,
-            'status' => self::STATUS_MAP[$envelope->status] ?? $envelope->status,
+            'status' => EnvelopeApiPayload::status($envelope),
             'sign_url' => route('public.sign.show', $signer->token),
         ], 201);
     }
@@ -117,13 +109,7 @@ class EnvelopeApiController extends Controller
     {
         abort_unless($envelope->user_id === $request->user()->id, 404);
 
-        return response()->json([
-            'id' => $envelope->id,
-            'status' => self::STATUS_MAP[$envelope->status] ?? $envelope->status,
-            'created_at' => $envelope->created_at->toIso8601String(),
-            'signed_at' => $envelope->completed_at?->toIso8601String(),
-            'download_url' => $this->downloadUrl($envelope),
-        ]);
+        return response()->json(EnvelopeApiPayload::of($envelope));
     }
 
     public function cancel(Request $request, Envelope $envelope)
@@ -132,7 +118,7 @@ class EnvelopeApiController extends Controller
 
         // Idempotente: o integrador pode repetir a chamada após um timeout — sem evento nem e-mail novos.
         if ($envelope->status === 'cancelled') {
-            return response()->json(['id' => $envelope->id, 'status' => self::STATUS_MAP['cancelled']]);
+            return response()->json(['id' => $envelope->id, 'status' => EnvelopeApiPayload::status($envelope)]);
         }
 
         // Todos assinaram e o lacre ainda não concluiu (na fila ou seal_failed): cancelar agora descartaria assinaturas válidas.
@@ -146,23 +132,7 @@ class EnvelopeApiController extends Controller
 
         $this->envelopes->cancel($envelope);
 
-        return response()->json(['id' => $envelope->id, 'status' => self::STATUS_MAP['cancelled']]);
-    }
-
-    private function downloadUrl(Envelope $envelope): ?string
-    {
-        if ($envelope->status !== 'completed' || ! $envelope->final_pdf_path) {
-            return null;
-        }
-
-        $disk = Storage::disk('documents');
-        if (! $disk->exists($envelope->final_pdf_path)) {
-            return null;
-        }
-
-        return $disk->temporaryUrl($envelope->final_pdf_path, now()->addMinutes(5), [
-            'ResponseContentDisposition' => 'attachment; filename="'.$envelope->title.' (assinado).pdf"',
-        ]);
+        return response()->json(['id' => $envelope->id, 'status' => EnvelopeApiPayload::status($envelope)]);
     }
 
     /** @return array{page:int,x:float,y:float,w:float,h:float} */
@@ -199,7 +169,7 @@ class EnvelopeApiController extends Controller
     {
         $body = ['message' => $message];
         if ($envelope) {
-            $body['status'] = self::STATUS_MAP[$envelope->status] ?? $envelope->status;
+            $body['status'] = EnvelopeApiPayload::status($envelope);
         }
 
         return response()->json($body, 422);

@@ -10,6 +10,7 @@ use App\Services\Envelope\EnvelopeService;
 use App\Services\Envelope\EvidenceReportGenerator;
 use App\Services\NotificationService;
 use App\Services\Pdf\PdfSignerService;
+use App\Services\Webhook\EnvelopeWebhook;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Mail;
@@ -32,6 +33,7 @@ class SealEnvelopeJob implements ShouldQueue
         EnvelopePdfComposer $composer,
         EnvelopeService $service,
         NotificationService $notification,
+        EnvelopeWebhook $webhook,
     ): void {
         $envelope = $this->envelope->fresh(['signers.fields', 'user.signingCertificate']);
 
@@ -79,6 +81,10 @@ class SealEnvelopeJob implements ShouldQueue
 
             $service->recordEvent($envelope, null, 'sealed', meta: ['sha256_final' => $envelope->sha256_final]);
             $service->recordEvent($envelope, null, 'completed');
+
+            // Antes das notificações: se uma delas falhar, a nova tentativa do job sai cedo
+            // (status já é completed) e o webhook nunca seria disparado.
+            $webhook->dispatch($envelope, 'envelope.signed');
 
             Mail::to($envelope->user->email)->send(new EnvelopeCompleted($envelope));
             foreach ($envelope->signers as $signer) {

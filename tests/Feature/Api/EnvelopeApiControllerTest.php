@@ -88,6 +88,7 @@ class EnvelopeApiControllerTest extends TestCase
         $this->assertSame($user->id, $envelope->user_id);
         $this->assertSame('Nota Promissória #1234', $envelope->title);
         $this->assertSame('sent', $envelope->status);
+        $this->assertSame('api', $envelope->source);
         $this->assertCount(1, $envelope->signers);
 
         $signer = $envelope->signers->first();

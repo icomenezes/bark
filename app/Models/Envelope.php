@@ -16,7 +16,7 @@ class Envelope extends Model
         'verification_code',
         'original_pdf_path', 'final_pdf_path',
         'sha256_original', 'sha256_final',
-        'signing_order', 'status', 'expires_at', 'completed_at',
+        'signing_order', 'status', 'source', 'expires_at', 'completed_at',
     ];
 
     protected function casts(): array

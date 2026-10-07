@@ -14,6 +14,7 @@ use App\Models\EnvelopeSigner;
 use App\Models\Setting;
 use App\Models\User;
 use App\Services\NotificationService;
+use App\Services\Webhook\EnvelopeWebhook;
 use App\Support\ConsentTerm;
 use App\Support\Cpf;
 use App\Support\SignatureImage;
@@ -25,7 +26,10 @@ use Illuminate\Support\Facades\Storage;
 
 class EnvelopeService
 {
-    public function __construct(private NotificationService $notification) {}
+    public function __construct(
+        private NotificationService $notification,
+        private EnvelopeWebhook $webhook,
+    ) {}
 
     /** Cria o envelope (draft) com signatários e posições de assinatura. */
     public function create(User $user, UploadedFile $pdf, array $data): Envelope
@@ -37,6 +41,7 @@ class EnvelopeService
                 'message' => $data['message'] ?? null,
                 'verification_code' => (string) \Illuminate\Support\Str::uuid(),
                 'signing_order' => $data['signing_order'],
+                'source' => $data['source'] ?? 'web',
                 'expires_at' => $data['expires_at'] ?? null,
                 'original_pdf_path' => 'pending',
                 'sha256_original' => hash_file('sha256', $pdf->getRealPath()),
@@ -253,6 +258,9 @@ class EnvelopeService
     {
         $envelope->update(['status' => 'cancelled']);
         $this->recordEvent($envelope, null, 'cancelled');
+
+        // Antes dos avisos aos signatários: uma falha neles não pode impedir o webhook.
+        $this->webhook->dispatch($envelope, 'envelope.cancelled');
 
         foreach ($envelope->signers()->where('status', '!=', 'pending')->get() as $signer) {
             if ($signer->channel === 'whatsapp') {
