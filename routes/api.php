@@ -7,5 +7,6 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::post('envelopes', [EnvelopeApiController::class, 'store']);
     Route::get('envelopes/{envelope}', [EnvelopeApiController::class, 'show']);
+    Route::post('envelopes/{envelope}/cancel', [EnvelopeApiController::class, 'cancel']);
     Route::post('sign-document', [SignDocumentApiController::class, 'store']);
 });

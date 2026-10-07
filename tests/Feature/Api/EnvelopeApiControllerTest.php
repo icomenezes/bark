@@ -2,9 +2,11 @@
 
 namespace Tests\Feature\Api;
 
+use App\Mail\Envelopes\EnvelopeCancelled;
 use App\Mail\Envelopes\EnvelopeInvite;
 use App\Models\Certificate;
 use App\Models\Envelope;
+use App\Models\EnvelopeSigner;
 use App\Models\Plan;
 use App\Models\Setting;
 use App\Models\User;
@@ -528,5 +530,157 @@ class EnvelopeApiControllerTest extends TestCase
             ->assertCreated();
 
         $this->assertSame('email_otp', Envelope::first()->signers->first()->auth_method);
+    }
+
+    // ─── Cancelamento ─────────────────────────────────────────────────────────
+
+    public function test_cancel_requires_authentication(): void
+    {
+        $envelope = Envelope::factory()->create(['status' => 'sent']);
+
+        $this->postJson("/api/v1/envelopes/{$envelope->id}/cancel")
+            ->assertUnauthorized();
+
+        $this->assertSame('sent', $envelope->fresh()->status);
+    }
+
+    public function test_cancel_returns_404_for_other_users_envelope(): void
+    {
+        $owner = $this->userWithPlan();
+        $token = $this->userWithPlan()->createToken('api')->plainTextToken;
+        $envelope = Envelope::factory()->for($owner)->create(['status' => 'sent']);
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson("/api/v1/envelopes/{$envelope->id}/cancel")
+            ->assertNotFound();
+
+        $this->assertSame('sent', $envelope->fresh()->status);
+    }
+
+    public function test_cancel_sent_envelope(): void
+    {
+        Mail::fake();
+        $user = $this->userWithPlan();
+        $token = $user->createToken('api')->plainTextToken;
+        $envelope = Envelope::factory()->for($user)->create(['status' => 'sent']);
+        EnvelopeSigner::factory()->for($envelope)->create(['email' => 'func@example.com', 'status' => 'notified']);
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson("/api/v1/envelopes/{$envelope->id}/cancel")
+            ->assertOk()
+            ->assertExactJson(['id' => $envelope->id, 'status' => 'cancelled']);
+
+        $this->assertSame('cancelled', $envelope->fresh()->status);
+        $this->assertSame(1, $envelope->events()->where('event', 'cancelled')->count());
+        Mail::assertSent(EnvelopeCancelled::class, fn ($m) => $m->hasTo('func@example.com'));
+    }
+
+    public function test_cancel_whatsapp_envelope_succeeds_with_the_real_mailer(): void
+    {
+        // Sem Mail::fake: o mailer real recusa mensagem sem destinatário, e o signatário de WhatsApp não tem e-mail.
+        Http::fake();
+        config(['services.evolution.url' => 'https://evo.test', 'services.evolution.instance' => 'i', 'services.evolution.key' => 'k']);
+        Setting::current()->update(['whatsapp_enabled' => true]);
+        Setting::clearCache();
+        $user = $this->userWithPlan();
+        $token = $user->createToken('api')->plainTextToken;
+        $envelope = Envelope::factory()->for($user)->create(['status' => 'sent']);
+        EnvelopeSigner::factory()->for($envelope)->create([
+            'channel' => 'whatsapp', 'email' => null, 'whatsapp' => '11999998888', 'status' => 'notified',
+        ]);
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson("/api/v1/envelopes/{$envelope->id}/cancel")
+            ->assertOk()
+            ->assertExactJson(['id' => $envelope->id, 'status' => 'cancelled']);
+
+        $this->assertSame('cancelled', $envelope->fresh()->status);
+    }
+
+    public function test_cancel_draft_envelope(): void
+    {
+        Mail::fake();
+        $user = $this->userWithPlan();
+        $token = $user->createToken('api')->plainTextToken;
+        $envelope = Envelope::factory()->for($user)->create(['status' => 'draft']);
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson("/api/v1/envelopes/{$envelope->id}/cancel")
+            ->assertOk()
+            ->assertExactJson(['id' => $envelope->id, 'status' => 'cancelled']);
+
+        $this->assertSame('cancelled', $envelope->fresh()->status);
+    }
+
+    public function test_cancel_is_idempotent_for_already_cancelled_envelope(): void
+    {
+        Mail::fake();
+        $user = $this->userWithPlan();
+        $token = $user->createToken('api')->plainTextToken;
+        $envelope = Envelope::factory()->for($user)->create(['status' => 'cancelled']);
+        EnvelopeSigner::factory()->for($envelope)->create(['status' => 'notified']);
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson("/api/v1/envelopes/{$envelope->id}/cancel")
+            ->assertOk()
+            ->assertExactJson(['id' => $envelope->id, 'status' => 'cancelled']);
+
+        $this->assertSame(0, $envelope->events()->count());
+        Mail::assertNothingSent();
+    }
+
+    public function test_cancel_refuses_sent_envelope_already_signed_by_everyone(): void
+    {
+        Mail::fake();
+        $user = $this->userWithPlan();
+        $token = $user->createToken('api')->plainTextToken;
+        $envelope = Envelope::factory()->for($user)->create(['status' => 'sent']);
+        EnvelopeSigner::factory()->for($envelope)->create(['status' => 'signed', 'signed_at' => now()]);
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson("/api/v1/envelopes/{$envelope->id}/cancel")
+            ->assertUnprocessable()
+            ->assertExactJson([
+                'message' => 'Assinatura já concluída, documento em processamento.',
+                'status' => 'pending',
+            ]);
+
+        $this->assertSame('sent', $envelope->fresh()->status);
+        $this->assertSame(0, $envelope->events()->count());
+        Mail::assertNothingSent();
+    }
+
+    public function test_cancel_refuses_completed_envelope(): void
+    {
+        $user = $this->userWithPlan();
+        $token = $user->createToken('api')->plainTextToken;
+        $envelope = Envelope::factory()->for($user)->create(['status' => 'completed', 'completed_at' => now()]);
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson("/api/v1/envelopes/{$envelope->id}/cancel")
+            ->assertUnprocessable()
+            ->assertExactJson([
+                'message' => 'Este envelope não pode mais ser cancelado.',
+                'status' => 'signed',
+            ]);
+
+        $this->assertSame('completed', $envelope->fresh()->status);
+    }
+
+    public function test_cancel_refuses_declined_envelope(): void
+    {
+        $user = $this->userWithPlan();
+        $token = $user->createToken('api')->plainTextToken;
+        $envelope = Envelope::factory()->for($user)->create(['status' => 'declined']);
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson("/api/v1/envelopes/{$envelope->id}/cancel")
+            ->assertUnprocessable()
+            ->assertExactJson([
+                'message' => 'Este envelope não pode mais ser cancelado.',
+                'status' => 'declined',
+            ]);
+
+        $this->assertSame('declined', $envelope->fresh()->status);
     }
 }

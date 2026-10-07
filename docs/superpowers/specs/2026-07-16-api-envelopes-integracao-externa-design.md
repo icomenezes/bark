@@ -9,6 +9,11 @@ Data: 2026-07-16 (atualizado em 2026-07-20 — ver nota de atualização abaixo)
 > certificado próprio do usuário — ver
 > `docs/superpowers/specs/2026-07-20-conclusao-adaptativa-copia-opcional-assinatura-avulsa-design.md`
 > para o design completo de ambas as mudanças.
+>
+> **Atualização 2026-10-07:** novo endpoint `POST /api/v1/envelopes/{id}/cancel`
+> (ver seção própria abaixo). Consumidor inicial: sistema Ponto, que cancela o
+> envelope anterior de uma folha de ponto antes de reenviá-la, para o funcionário
+> não ficar com dois links válidos.
 
 ## Contexto
 
@@ -44,6 +49,7 @@ formulário web, não um sistema paralelo.
 
 - `POST /api/v1/envelopes` — cria e envia o envelope
 - `GET /api/v1/envelopes/{id}` — consulta status
+- `POST /api/v1/envelopes/{id}/cancel` — cancela o envelope (adicionado em 2026-10-07)
 
 ### `POST /api/v1/envelopes`
 
@@ -154,6 +160,61 @@ vocabulário mais claro à integração externa):
   real: a versão original apontava para a rota web autenticada por sessão
   (`envelopes.download`), inviável para consumo por API
 
+### `POST /api/v1/envelopes/{id}/cancel`
+
+Adicionado em 2026-10-07. Sem corpo. Cancela o envelope para que o link de
+assinatura deixe de valer: `/sign/{token}` passa a mostrar "não está mais
+disponível". Reaproveita `EnvelopeService::cancel()`, a mesma lógica do botão
+"Cancelar" da tela web: marca `cancelled`, grava o evento `cancelled` na trilha de
+auditoria e avisa os signatários já notificados pelo canal de cada um:
+`EnvelopeCancelled` por e-mail, ou mensagem de WhatsApp para quem tem
+`channel = whatsapp`. Uma falha da Evolution API é só logada e não impede o
+cancelamento.
+
+Regras, avaliadas nesta ordem:
+
+1. Envelope de outro usuário ou inexistente → `404` (mesmo escopo do GET)
+2. Já `cancelled` → `200` sem fazer nada: nenhum evento novo, nenhum e-mail.
+   **Idempotente**: o integrador pode repetir a chamada depois de um timeout
+3. `sent` com todos os signatários já assinados (lacre na fila ou com
+   `seal_failed`) → `422`, **não cancela**: as assinaturas são válidas e o
+   documento final está sendo gerado
+4. `draft` ou `sent` → cancela → `200`
+5. Qualquer outro status (`completed`, `declined`, `expired`) → `422`
+
+Resposta em caso de sucesso (`200 OK`), tanto para o cancelamento quanto para a
+repetição idempotente:
+
+```json
+{
+  "id": 42,
+  "status": "cancelled"
+}
+```
+
+Todo `422` deste endpoint traz, além de `message`, o campo `status` com o status
+**atual** do envelope já mapeado (mesma tabela do GET):
+
+```json
+{
+  "message": "Este envelope não pode mais ser cancelado.",
+  "status": "signed"
+}
+```
+
+Uso pelo integrador ao reenviar um documento: com `declined` ou `expired`, o link
+antigo já não vale e é seguro criar o envelope novo; com `pending` ou `signed`, o
+documento anterior foi (ou está sendo) assinado e o reenvio deve ser abortado.
+
+| Situação | HTTP | Corpo |
+|---|---|---|
+| Token ausente/inválido | `401` | `{"message": "Unauthenticated."}` |
+| Envelope de outro usuário ou inexistente | `404` | `{"message": "Not Found."}` |
+| Todos já assinaram, lacre em processamento | `422` | `{"message": "Assinatura já concluída, documento em processamento.", "status": "pending"}` |
+| Envelope `completed` | `422` | `{"message": "Este envelope não pode mais ser cancelado.", "status": "signed"}` |
+| Envelope `declined` | `422` | `{"message": "Este envelope não pode mais ser cancelado.", "status": "declined"}` |
+| Envelope `expired` | `422` | `{"message": "Este envelope não pode mais ser cancelado.", "status": "expired"}` |
+
 ### Erros
 
 | Situação | HTTP | Corpo |
@@ -196,3 +257,10 @@ vocabulário mais claro à integração externa):
 - Teste (adicionado 2026-07-20): `send_signed_copy` omitido → persistido como
   `true`; `send_signed_copy: false` → persistido como `false` em
   `envelope_signers.send_signed_copy`
+- Testes (adicionados 2026-10-07), `POST /api/v1/envelopes/{id}/cancel`: sem token
+  → `401`; envelope de outro usuário → `404`; `sent` → `200`, `cancelled` no
+  banco, evento `cancelled` e `EnvelopeCancelled` enviado; signatário de WhatsApp
+  sem e-mail → `200` com o mailer real (antes estourava `500`); `draft` → `200`; já
+  `cancelled` → `200` sem evento novo nem e-mail; `sent` com todos assinados →
+  `422` e continua `sent`; `completed` → `422` com `"status": "signed"`;
+  `declined` → `422` com `"status": "declined"`

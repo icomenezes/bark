@@ -126,6 +126,29 @@ class EnvelopeApiController extends Controller
         ]);
     }
 
+    public function cancel(Request $request, Envelope $envelope)
+    {
+        abort_unless($envelope->user_id === $request->user()->id, 404);
+
+        // Idempotente: o integrador pode repetir a chamada após um timeout — sem evento nem e-mail novos.
+        if ($envelope->status === 'cancelled') {
+            return response()->json(['id' => $envelope->id, 'status' => self::STATUS_MAP['cancelled']]);
+        }
+
+        // Todos assinaram e o lacre ainda não concluiu (na fila ou seal_failed): cancelar agora descartaria assinaturas válidas.
+        if ($envelope->status === 'sent' && $envelope->allSigned()) {
+            return $this->unprocessable('Assinatura já concluída, documento em processamento.', $envelope);
+        }
+
+        if (! in_array($envelope->status, ['draft', 'sent'], true)) {
+            return $this->unprocessable('Este envelope não pode mais ser cancelado.', $envelope);
+        }
+
+        $this->envelopes->cancel($envelope);
+
+        return response()->json(['id' => $envelope->id, 'status' => self::STATUS_MAP['cancelled']]);
+    }
+
     private function downloadUrl(Envelope $envelope): ?string
     {
         if ($envelope->status !== 'completed' || ! $envelope->final_pdf_path) {
@@ -171,8 +194,14 @@ class EnvelopeApiController extends Controller
         return $path;
     }
 
-    private function unprocessable(string $message)
+    /** Com $envelope, inclui o status mapeado — o integrador decide o próximo passo por ele. */
+    private function unprocessable(string $message, ?Envelope $envelope = null)
     {
-        return response()->json(['message' => $message], 422);
+        $body = ['message' => $message];
+        if ($envelope) {
+            $body['status'] = self::STATUS_MAP[$envelope->status] ?? $envelope->status;
+        }
+
+        return response()->json($body, 422);
     }
 }
