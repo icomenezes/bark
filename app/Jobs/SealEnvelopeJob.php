@@ -2,18 +2,15 @@
 
 namespace App\Jobs;
 
-use App\Mail\Envelopes\EnvelopeCompleted;
 use App\Models\Envelope;
 use App\Models\Setting;
 use App\Services\Envelope\EnvelopePdfComposer;
 use App\Services\Envelope\EnvelopeService;
 use App\Services\Envelope\EvidenceReportGenerator;
-use App\Services\NotificationService;
 use App\Services\Pdf\PdfSignerService;
 use App\Services\Webhook\EnvelopeWebhook;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -32,7 +29,6 @@ class SealEnvelopeJob implements ShouldQueue
         EvidenceReportGenerator $evidence,
         EnvelopePdfComposer $composer,
         EnvelopeService $service,
-        NotificationService $notification,
         EnvelopeWebhook $webhook,
     ): void {
         $envelope = $this->envelope->fresh(['signers.fields', 'user.signingCertificate']);
@@ -86,21 +82,8 @@ class SealEnvelopeJob implements ShouldQueue
             // (status já é completed) e o webhook nunca seria disparado.
             $webhook->dispatch($envelope, 'envelope.signed');
 
-            Mail::to($envelope->user->email)->send(new EnvelopeCompleted($envelope));
-            foreach ($envelope->signers as $signer) {
-                if (! $signer->send_signed_copy) {
-                    continue;
-                }
-
-                if ($signer->channel === 'whatsapp') {
-                    $notification->sendWhatsAppTo($signer->whatsapp,
-                        "✅ *Documento assinado* — O documento *{$envelope->title}* foi completado e assinado por todos.\n".
-                        'Acesse para download: '.route('public.sign.download', $signer->token)
-                    );
-                } else {
-                    Mail::to($signer->email)->send(new EnvelopeCompleted($envelope, $signer));
-                }
-            }
+            // Mesmo aviso do "Reprocessar lacre": remetente + signatários, em cada canal de cada um.
+            $service->notifyCompletion($envelope);
         } catch (\Throwable $e) {
             report($e);
             $service->recordEvent($envelope, null, 'seal_failed', meta: ['error' => $e->getMessage()]);

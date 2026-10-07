@@ -90,6 +90,25 @@ class EnvelopeSigner extends Model
         return $this->expected_cpf !== null && $this->cpfAttempts() >= self::MAX_CPF_ATTEMPTS;
     }
 
+    /**
+     * Por onde este signatário recebe convite, lembrete, conclusão e cancelamento.
+     * Canal WhatsApp: só WhatsApp. Canal e-mail: e-mail, mais uma cópia pelo WhatsApp
+     * quando há número e a conta do remetente tem WhatsApp de envelope habilitado.
+     * O OTP não usa esta regra: o código vai só pelo canal.
+     *
+     * @return list<'email'|'whatsapp'>
+     */
+    public function noticeChannels(): array
+    {
+        if ($this->channel === 'whatsapp') {
+            return ['whatsapp'];
+        }
+
+        return $this->whatsapp && $this->envelope->user->whatsapp_envelope_enabled
+            ? ['email', 'whatsapp']
+            : ['email'];
+    }
+
     /** Pode assinar agora: envelope enviado, não expirado, e este signatário ainda pendente. */
     public function canSign(): bool
     {

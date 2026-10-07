@@ -4,6 +4,7 @@ namespace App\Services\Envelope;
 
 use App\Jobs\SealEnvelopeJob;
 use App\Mail\Envelopes\EnvelopeCancelled;
+use App\Mail\Envelopes\EnvelopeCompleted;
 use App\Mail\Envelopes\EnvelopeDeclined;
 use App\Mail\Envelopes\EnvelopeInvite;
 use App\Mail\Envelopes\EnvelopeOtp;
@@ -21,6 +22,7 @@ use App\Support\SignatureImage;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 
@@ -96,14 +98,11 @@ class EnvelopeService
     /** Convite (ou lembrete) pelo canal do signatário (e-mail ou WhatsApp). */
     public function notifySigner(EnvelopeSigner $signer, bool $reminder = false): void
     {
-        if ($signer->channel === 'whatsapp') {
-            $this->notification->sendWhatsAppTo($signer->whatsapp,
-                "📄 *{$signer->envelope->user->name}* enviou o documento *{$signer->envelope->title}* para você assinar.\n".
-                'Acesse: '.route('public.sign.show', $signer->token)
-            );
-        } else {
-            Mail::to($signer->email)->send(new EnvelopeInvite($signer, $reminder));
-        }
+        $this->notifyOnChannels($signer,
+            fn () => Mail::to($signer->email)->send(new EnvelopeInvite($signer, $reminder)),
+            "📄 *{$signer->envelope->user->name}* enviou o documento *{$signer->envelope->title}* para você assinar.\n".
+            'Acesse: '.route('public.sign.show', $signer->token)
+        );
 
         if ($signer->status === 'pending') {
             $signer->update(['status' => 'notified']);
@@ -263,35 +262,62 @@ class EnvelopeService
         $this->webhook->dispatch($envelope, 'envelope.cancelled');
 
         foreach ($envelope->signers()->where('status', '!=', 'pending')->get() as $signer) {
-            if ($signer->channel === 'whatsapp') {
-                $this->notification->sendWhatsAppTo($signer->whatsapp,
-                    "🚫 O documento *{$envelope->title}* enviado por *{$envelope->user->name}* foi cancelado.\n".
-                    'O link de assinatura que você recebeu não é mais válido.'
-                );
-            } else {
-                Mail::to($signer->email)->send(new EnvelopeCancelled($envelope));
-            }
+            $this->notifyOnChannels($signer,
+                fn () => Mail::to($signer->email)->send(new EnvelopeCancelled($envelope)),
+                "🚫 O documento *{$envelope->title}* enviado por *{$envelope->user->name}* foi cancelado.\n".
+                'O link de assinatura que você recebeu não é mais válido.'
+            );
         }
     }
 
-    /** Reenvia notificações de conclusão ao remetente e signatários. */
+    /** Avisa a conclusão ao remetente e aos signatários (no lacre e no "Reprocessar lacre"). */
     public function notifyCompletion(Envelope $envelope): void
     {
-        Mail::to($envelope->user->email)->send(new \App\Mail\Envelopes\EnvelopeCompleted($envelope));
+        Mail::to($envelope->user->email)->send(new EnvelopeCompleted($envelope));
         foreach ($envelope->signers as $signer) {
             if (! $signer->send_signed_copy) {
                 continue;
             }
 
-            if ($signer->channel === 'whatsapp') {
-                $downloadUrl = route('public.sign.document', $signer->token);
-                $this->notification->sendWhatsAppTo($signer->whatsapp,
-                    "✅ *Documento assinado* — O documento *{$envelope->title}* foi completado e assinado por todos.\n".
-                    "Acesse: {$downloadUrl}"
-                );
-            } else {
-                Mail::to($signer->email)->send(new \App\Mail\Envelopes\EnvelopeCompleted($envelope, $signer));
-            }
+            $this->notifyOnChannels($signer,
+                fn () => Mail::to($signer->email)->send(new EnvelopeCompleted($envelope, $signer)),
+                "✅ *Documento assinado* — O documento *{$envelope->title}* foi completado e assinado por todos.\n".
+                'Acesse: '.route('public.sign.document', $signer->token)
+            );
+        }
+    }
+
+    /**
+     * Entrega um aviso em cada canal do signatário (EnvelopeSigner::noticeChannels).
+     * O e-mail sai primeiro; o WhatsApp de quem é do canal e-mail é cópia, então uma
+     * falha nele é só logada e não interrompe o fluxo do envelope.
+     */
+    private function notifyOnChannels(EnvelopeSigner $signer, \Closure $sendEmail, string $whatsAppText): void
+    {
+        $channels = $signer->noticeChannels();
+
+        if (in_array('email', $channels, true)) {
+            $sendEmail();
+        }
+
+        if (! in_array('whatsapp', $channels, true)) {
+            return;
+        }
+
+        if ($signer->channel === 'whatsapp') {
+            $this->notification->sendWhatsAppTo($signer->whatsapp, $whatsAppText);
+
+            return;
+        }
+
+        try {
+            $this->notification->sendWhatsAppTo($signer->whatsapp, $whatsAppText);
+        } catch (\Throwable $e) {
+            Log::warning('Envelope: cópia por WhatsApp falhou', [
+                'envelope_id' => $signer->envelope_id,
+                'signer_id' => $signer->id,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

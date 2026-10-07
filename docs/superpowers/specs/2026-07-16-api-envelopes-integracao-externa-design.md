@@ -78,10 +78,19 @@ Regras:
 - `signer_name`: obrigatório, string, máx 255
 - `signer_email`: obrigatório, e-mail válido
 - `signer_whatsapp`: opcional, string (só dígitos ou formatado — mesma normalização
-  do `WhatsAppService`). O convite sempre sai por e-mail (`EnvelopeInvite`); se
-  `signer_whatsapp` for informado, `EnvelopeService::notifySigner()` também envia
-  um espelho por WhatsApp automaticamente — comportamento já existente, reaproveitado
-  sem mudança
+  do `WhatsAppService`); obrigatório quando `channel = "whatsapp"`. No canal padrão,
+  `email`, o número vira uma **cópia por WhatsApp** dos avisos ao signatário, sem
+  deixar de mandar o e-mail: convite, lembrete, conclusão (respeitando
+  `send_signed_copy`) e cancelamento. A cópia só sai se:
+  - a conta do remetente tiver o WhatsApp de envelope habilitado
+    (`users.whatsapp_envelope_enabled`, ligado pelo admin em `/admin/users/{id}/edit`);
+  - o WhatsApp da plataforma estiver ativo (`settings.whatsapp_enabled`).
+
+  Sem número ou com a conta não habilitada, só e-mail. Se o envio pelo WhatsApp
+  falhar, a falha vai para o log e o e-mail e o envelope seguem normalmente. O código
+  OTP (`auth_method = "email_otp"`) continua indo só por e-mail. A regra fica em
+  `EnvelopeSigner::noticeChannels()`. (Atualizado em 2026-10-07: entre 2026-07-17 e
+  essa data a cópia não saía, porque o convite seguia só o canal.)
 - `send_signed_copy`: opcional, boolean, **default `true`** (adicionado em
   2026-07-20). Quando `false`, o signatário não recebe a notificação de
   conclusão com o PDF final (nem por e-mail nem por WhatsApp) — só o convite

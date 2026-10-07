@@ -190,6 +190,10 @@ plataforma. Spec: `docs/superpowers/specs/2026-07-15-envelopes-assinatura-eletro
   para copiar (nunca como `<a href>`) e só enquanto o signatário pode assinar. Se o **dono** abrir
   `/sign/{token}`, grava `owner_previewed` em vez de `viewed` e **não** mexe no status: atribuir a
   visualização ao signatário poria uma afirmação falsa no certificado de evidências.
+- **Canais de aviso**: `EnvelopeSigner::noticeChannels()` decide convite/lembrete/conclusão/cancelamento.
+  Canal `whatsapp` → só WhatsApp; canal `email` → e-mail + **cópia por WhatsApp** se há número e a conta
+  tem `whatsapp_envelope_enabled`. A cópia nunca derruba o fluxo (falha só vai para o log). OTP segue só
+  o canal. Lacre e "Reprocessar lacre" usam o mesmo `notifyCompletion()`
 - Assinaturas de convidados são só dados (PNG em `envelopes/{id}/signatures/` + eventos); o PDF é
   modificado uma única vez, no lacre
 - Recusa de qualquer signatário encerra o envelope inteiro

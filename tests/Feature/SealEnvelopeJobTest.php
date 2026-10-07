@@ -11,6 +11,7 @@ use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -108,6 +109,36 @@ class SealEnvelopeJobTest extends TestCase
         $this->assertSame('completed', $envelope->fresh()->status);
         Queue::assertPushed(SendEnvelopeWebhookJob::class, fn ($job) => $job->envelopeId === $envelope->id
             && $job->event === 'envelope.signed');
+    }
+
+    public function test_sealing_notifies_whatsapp_signers_with_the_document_link(): void
+    {
+        Storage::fake('local');
+        Storage::fake('documents');
+        Mail::fake();
+        Http::fake();
+        config(['services.evolution.url' => 'https://evo.test', 'services.evolution.instance' => 'i', 'services.evolution.key' => 'k']);
+        Setting::current()->update(['whatsapp_enabled' => true]);
+        Setting::clearCache();
+        $this->configureRealPlatformCertificate();
+        $owner = User::factory()->create(['whatsapp_envelope_enabled' => true]);
+        $envelope = $this->makeSignedEnvelope($owner);
+        $whatsappSigner = $envelope->signers->first();
+        $whatsappSigner->update(['channel' => 'whatsapp', 'email' => null, 'whatsapp' => '11999998888']);
+        $emailSigner = EnvelopeSigner::factory()->for($envelope)->create([
+            'channel' => 'email', 'email' => 'copia@example.com', 'whatsapp' => '11977776666',
+            'status' => 'signed', 'signed_at' => now(), 'sign_position' => 2,
+        ]);
+
+        $this->seal($envelope);
+
+        // O aviso apontava para uma rota inexistente: a exceção gravava seal_failed e cortava o loop.
+        $this->assertFalse($envelope->events()->where('event', 'seal_failed')->exists());
+        foreach ([$whatsappSigner, $emailSigner] as $signer) {
+            Http::assertSent(fn ($request) => str_contains($request['number'] ?? '', $signer->whatsapp)
+                && str_contains($request['text'] ?? '', route('public.sign.document', $signer->token)));
+        }
+        Mail::assertSent(EnvelopeCompleted::class, fn ($m) => $m->hasTo('copia@example.com'));
     }
 
     public function test_seals_envelope_end_to_end(): void
